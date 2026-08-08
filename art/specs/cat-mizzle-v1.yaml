@@ -1,0 +1,52 @@
+id: cat:mizzle:v1
+class: cat
+stage: base
+# Design-doc alias: "puddle cat" — rain / fern / pond visitor.
+
+gameplay:
+  rarity: rare
+  affinities:
+    precipitation: strong
+    pond: medium
+    fern: medium
+    dusk: medium
+
+visual:
+  species: domestic_short_hair
+  coat: soft_grey_blue
+  silhouette: round
+  pose: seated_three_quarter
+  personality: shy_curious
+  motif:
+    - rain
+    - puddles
+    - ferns
+
+sprite:
+  native_width: 32
+  native_height: 32
+  baseline_y: 29
+  max_colors: 9
+  alpha: binary
+  direction: right
+
+palette:
+  source: palette:purrden-core:v1
+  accents:
+    - cool_blue
+    - mist
+    - pine
+
+forbidden:
+  - antialiasing
+  - gradients
+  - text
+  - realistic_fur
+  - extra_limbs
+  - cropped_ears
+
+generation:
+  lane: pixel-sdxl-experimental
+  recipe_version: cat-master-v3
+  candidate_budget: 12
+  refinement_rounds: 3

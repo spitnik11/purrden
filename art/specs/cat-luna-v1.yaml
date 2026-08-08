@@ -1,0 +1,51 @@
+id: cat:luna:v1
+class: cat
+stage: base
+
+gameplay:
+  rarity: rare
+  affinities:
+    daylight_night: strong
+    moon_full: strong
+    dusk: medium
+    pond: soft
+
+visual:
+  species: domestic_short_hair
+  coat: silver_night
+  silhouette: tall_alert
+  pose: sitting_upright
+  personality: watchful_serene
+  motif:
+    - moon
+    - night
+    - stars
+
+sprite:
+  native_width: 32
+  native_height: 32
+  baseline_y: 29
+  max_colors: 9
+  alpha: binary
+  direction: right
+
+palette:
+  source: palette:purrden-core:v1
+  accents:
+    - ice
+    - dusk
+    - cloud
+
+forbidden:
+  - antialiasing
+  - gradients
+  - text
+  - realistic_fur
+  - extra_limbs
+  - cropped_ears
+
+generation:
+  lane: pixel-sdxl-experimental
+  recipe_version: cat-master-v3
+  candidate_budget: 12
+  refinement_rounds: 3

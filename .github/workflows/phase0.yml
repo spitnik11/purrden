@@ -1,0 +1,32 @@
+name: Phase 0
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Spawn engine conformance (JS ↔ Python)
+        run: python tools/conformance.py
+
+      - name: Spawn property invariants
+        run: python tools/test_property_spawn.py
+
+      - name: Focus state machine
+        run: python tools/test_focus.py
+
+      - name: Art license registry present
+        run: python tools/art-factory/cli/art.py licenses | head -n 5

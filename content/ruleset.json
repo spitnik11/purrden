@@ -1,0 +1,18 @@
+{
+  "version": "2026.09.0",
+  "algorithm_version": "spawn-rng:v1",
+  "garden_slot_count": 4,
+  "clamp_min_millilogits": -16000,
+  "score_round_step": 10,
+  "streak_bonus_per_day": 50,
+  "streak_bonus_cap": 500,
+  "discovery_bonus": 400,
+  "recent_visit_penalty": 600,
+  "fully_evolved_penalty": 1200,
+  "pity": {
+    "common":    { "per_miss": 0,   "cap": 0 },
+    "uncommon":  { "per_miss": 40,  "cap": 2000 },
+    "rare":      { "per_miss": 80,  "cap": 4000 },
+    "legendary": { "per_miss": 160, "cap": 8000 }
+  }
+}

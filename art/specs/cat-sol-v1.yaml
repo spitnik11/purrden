@@ -1,0 +1,51 @@
+id: cat:sol:v1
+class: cat
+stage: base
+
+gameplay:
+  rarity: uncommon
+  affinities:
+    precipitation_none: strong
+    daylight_day: strong
+    sunny_rock: strong
+    flower: medium
+
+visual:
+  species: domestic_short_hair
+  coat: warm_golden
+  silhouette: stretched_sunbasker
+  pose: lounging_side
+  personality: lazy_content
+  motif:
+    - sun
+    - warmth
+    - open_sky
+
+sprite:
+  native_width: 32
+  native_height: 32
+  baseline_y: 29
+  max_colors: 9
+  alpha: binary
+  direction: right
+
+palette:
+  source: palette:purrden-core:v1
+  accents:
+    - gold
+    - clay
+    - cream
+
+forbidden:
+  - antialiasing
+  - gradients
+  - text
+  - realistic_fur
+  - extra_limbs
+  - cropped_ears
+
+generation:
+  lane: pixel-sdxl-experimental
+  recipe_version: cat-master-v3
+  candidate_budget: 12
+  refinement_rounds: 3

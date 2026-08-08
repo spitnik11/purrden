@@ -1,0 +1,49 @@
+id: cat:tabby:v1
+class: cat
+stage: base
+
+gameplay:
+  rarity: common
+  fallback: true
+  affinities:
+    daylight: soft
+    flower: soft
+    sunny_rock: soft
+
+visual:
+  species: domestic_short_hair
+  coat: classic_tabby
+  silhouette: compact
+  pose: seated_front_three_quarter
+  personality: friendly_ordinary
+  motif:
+    - everyday
+    - welcome
+
+sprite:
+  native_width: 32
+  native_height: 32
+  baseline_y: 29
+  max_colors: 9
+  alpha: binary
+  direction: right
+
+palette:
+  source: palette:purrden-core:v1
+  accents:
+    - sand
+    - bark
+
+forbidden:
+  - antialiasing
+  - gradients
+  - text
+  - realistic_fur
+  - extra_limbs
+  - cropped_ears
+
+generation:
+  lane: pixel-sdxl-experimental
+  recipe_version: cat-master-v3
+  candidate_budget: 12
+  refinement_rounds: 3

@@ -1,0 +1,61 @@
+# Constrained SDXL recipe for Purrden cats (recipe priors, not immutable truths).
+# Values seed from local model notes; evaluation sweeps may replace them over time.
+
+id: recipe:cat-master:v3
+lane: pixel-sdxl-experimental
+target_class: cat
+
+checkpoint:
+  registry_key: pixelArtDiffusionXL_spriteShaper
+  prompt_rules:
+    prefix:
+      - "Pixel Art"
+    keep_prompt_short: true
+    allowed_bit_hints:
+      - "8 bit"
+      - "16 bit"
+      - "32 bit"
+  generation:
+    cfg_min: 4
+    cfg_max: 12
+    cfg_default: 5.5
+    steps_default: 30
+  refinement:
+    max_denoise: 0.25
+  warnings:
+    - output_is_not_guaranteed_pixel_perfect
+    - avoid_realistic_or_photography_style_early_in_prompt
+
+lora:
+  registry_key: ArsMJStyleSDXL_-_Pixel_Art
+  preferred_strength:
+    min: 0.40
+    max: 0.80
+    sweep: [0.40, 0.55, 0.70, 0.80]
+  tags:
+    low_bit_positive: fewP
+    low_bit_negative: manyP
+  notes:
+    - lower CFG if output becomes melty
+    - style becomes increasingly visible above roughly 0.35
+
+pipeline:
+  # Do NOT ask diffusion for finished 32×32 geometry.
+  - semantic_generation_hires
+  - crop_subject_normalize
+  - pixel_grid_estimate
+  - native_downsample_or_pixel_art_fixer
+  - palette_quantize_purrden_core_v1
+  - binary_alpha_enforce
+  - compose_32x32
+  - hard_qa
+
+budgets:
+  candidate_budget: 12
+  refinement_rounds: 3
+  vlm_top_k: 3
+
+acceptance:
+  hard_qa_required: true
+  human_promotion_required: true
+  shipping_requires_approved_models: true

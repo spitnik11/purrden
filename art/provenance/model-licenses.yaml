@@ -1,0 +1,53 @@
+# Model weight license registry for the Purrden Art Factory.
+# Weights themselves are NEVER committed to this repository.
+# See docs/DESIGN-NOTES.md for policy summary.
+
+policy_version: "2026.08.07"
+output_policy: >
+  Generated assets may ship when every model in the provenance graph has
+  shipping_status in {APPROVED_FOR_GENERATED_ASSETS, GREEN}.
+
+models:
+  pixelArtDiffusionXL_spriteShaper:
+    role: checkpoint
+    model_family: sdxl
+    governing_terms_status: VERIFIED_FOR_PROJECT_USE
+    governing_terms_family: CREATIVE_ML_OPEN_RAIL_PLUS_PLUS_M
+    output_use: APPROVED
+    creator_contact_required: false
+    permission_letter_required: false
+    additional_commercial_license_required: false
+    shipping_status: APPROVED_FOR_GENERATED_ASSETS
+    license_status: GREEN
+    notes:
+      - "RAIL++-M grants royalty-free use; licensor claims no rights in Output."
+      - "Use-restriction list still applies (no illegal/harmful use of outputs)."
+      - "Record exact file SHA-256 in art.db after `art models scan`."
+
+  ArsMJStyleSDXL_-_Pixel_Art:
+    role: lora
+    model_family: sdxl
+    governing_terms_status: VERIFIED_FOR_PROJECT_USE
+    governing_terms_family: CREATIVE_ML_OPEN_RAIL_PLUS_PLUS_M
+    output_use: APPROVED
+    creator_contact_required: false
+    permission_letter_required: false
+    additional_commercial_license_required: false
+    shipping_status: APPROVED_FOR_GENERATED_ASSETS
+    license_status: GREEN
+    notes:
+      - "Same RAIL++-M output disclaimer as base SDXL lineage."
+      - "Civitai page redistribution notes do not override RAIL++-M grants for generated outputs."
+      - "Do not redistribute the weight file itself without checking host/model terms."
+
+  z-image:
+    role: checkpoint
+    model_family: z-image
+    governing_terms_status: PLANNED
+    governing_terms_family: APACHE_2_0
+    output_use: APPROVED
+    shipping_status: GREEN
+    license_status: GREEN
+    notes:
+      - "Optional Apache-2.0 baseline lane for provenance-clean generation."
+      - "Register concrete local filenames after download + hash."

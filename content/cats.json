@@ -1,0 +1,93 @@
+{
+  "ruleset_version": "2026.09.0",
+  "cats": [
+    {
+      "id": "cat:tabby:v1",
+      "rarity": "common",
+      "enabled": true,
+      "fallback": true,
+      "base_score": 0,
+      "min_garden_level": 0,
+      "biome": null,
+      "slot_tags": [],
+      "cooldown_hours": 0,
+      "affinities": {
+        "precipitation": {},
+        "daylight": { "day": 200 },
+        "season": {},
+        "moon": {},
+        "placements": { "flower": 200, "sunny_rock": 200 }
+      },
+      "evolutions": [
+        { "stage": "kitten", "min_bond": 0 },
+        { "stage": "cat", "min_bond": 200 }
+      ]
+    },
+    {
+      "id": "cat:sol:v1",
+      "rarity": "uncommon",
+      "enabled": true,
+      "fallback": false,
+      "base_score": -1600,
+      "min_garden_level": 1,
+      "biome": null,
+      "slot_tags": ["open"],
+      "cooldown_hours": 6,
+      "affinities": {
+        "precipitation": { "none": 300, "rain": -400 },
+        "daylight": { "day": 900, "dawn": 300 },
+        "season": { "summer": 300 },
+        "moon": {},
+        "placements": { "sunny_rock": 1000, "flower": 500 }
+      },
+      "evolutions": [
+        { "stage": "kitten", "min_bond": 0 },
+        { "stage": "sunbask", "min_bond": 250 }
+      ]
+    },
+    {
+      "id": "cat:mizzle:v1",
+      "rarity": "rare",
+      "enabled": true,
+      "fallback": false,
+      "base_score": -3200,
+      "min_garden_level": 1,
+      "biome": null,
+      "slot_tags": ["sheltered"],
+      "cooldown_hours": 18,
+      "affinities": {
+        "precipitation": { "drizzle": 700, "rain": 1400, "storm": 400, "none": -600 },
+        "daylight": { "dawn": 200, "dusk": 600 },
+        "season": { "autumn": 200 },
+        "moon": {},
+        "placements": { "fern": 800, "pond": 1000, "sunny_rock": -400 }
+      },
+      "evolutions": [
+        { "stage": "kitten", "min_bond": 0 },
+        { "stage": "raincoat", "min_bond": 250 }
+      ]
+    },
+    {
+      "id": "cat:luna:v1",
+      "rarity": "rare",
+      "enabled": true,
+      "fallback": false,
+      "base_score": -3200,
+      "min_garden_level": 2,
+      "biome": null,
+      "slot_tags": ["open"],
+      "cooldown_hours": 18,
+      "affinities": {
+        "precipitation": { "none": 200 },
+        "daylight": { "night": 1200, "dusk": 300 },
+        "season": { "autumn": 200, "winter": 200 },
+        "moon": { "full": 800, "waxing_gibbous": 300, "waning_gibbous": 300 },
+        "placements": { "pond": 300, "fern": 200 }
+      },
+      "evolutions": [
+        { "stage": "kitten", "min_bond": 0 },
+        { "stage": "moonlit", "min_bond": 300 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+# Dependencies / build
+node_modules/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.turbo/
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+*.swp
+
+# Art Factory local workbench (candidates, raw outputs, SQLite memory)
+.art-factory/**
+!.art-factory/.gitkeep
+
+# Model weights must never enter the repo
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# Large generated work products
+*.blend
+*.aseprite

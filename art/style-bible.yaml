@@ -1,0 +1,84 @@
+# Purrden style bible — machine-readable pixel contract
+# Consumed by Art Factory hard-QA and atlas build tooling.
+# Version bumps only when the visual contract changes.
+
+id: style:purrden-core:v1
+version: "1.0.0"
+title: Purrden 8-bit Core
+
+pixel:
+  cat_native: { width: 32, height: 32 }
+  tile_native: { width: 16, height: 16 }
+  scale: integer_only          # 1x, 2x, 3x… never fractional
+  sampling: nearest_neighbor   # PixiJS texture scale mode: nearest
+  alpha: binary                # fully opaque or fully transparent only
+  anti_aliasing: forbidden
+  gradients: forbidden
+  soft_shadows: forbidden
+
+cats:
+  baseline_y: 29               # feet on this row (0-indexed from top)
+  silhouette_margin:
+    top: 1
+    bottom: 0                  # feet may touch bottom edge at baseline
+    left: 1
+    right: 1
+  max_colors: 9                # including transparency as separate from palette count
+  direction_default: right
+  mirror_for_left: true        # do not generate left-facing unless asymmetry requires it
+  animation:
+    max_frame_delta_ratio: 0.35  # fraction of non-transparent pixels that may change per frame
+    required_idle_frames: 1
+    optional: [blink, tail_flick, breathe]
+
+tiles:
+  max_colors: 8
+  seam_compatible: true        # edge pixels must tile without 1px gaps
+
+palette:
+  id: palette:purrden-core:v1
+  # NES-era constrained core (~24 colors). Indices are stable.
+  colors:
+    - { name: transparent, hex: "#000000", alpha: 0 }
+    - { name: ink,         hex: "#1a1c2c" }
+    - { name: shadow,      hex: "#5d275d" }
+    - { name: brick,       hex: "#b13e53" }
+    - { name: clay,        hex: "#ef7d57" }
+    - { name: sand,        hex: "#ffcd75" }
+    - { name: leaf,        hex: "#a7f070" }
+    - { name: moss,        hex: "#38b764" }
+    - { name: pine,        hex: "#257179" }
+    - { name: deep,        hex: "#29366f" }
+    - { name: sky,         hex: "#3b5dc9" }
+    - { name: cool_blue,   hex: "#41a6f6" }
+    - { name: ice,         hex: "#73eff7" }
+    - { name: cloud,       hex: "#f4f4f4" }
+    - { name: mist,        hex: "#94b0c2" }
+    - { name: slate,       hex: "#566c86" }
+    - { name: coal,        hex: "#333c57" }
+    - { name: rose,        hex: "#ea90b4" }
+    - { name: gold,        hex: "#f4d35e" }
+    - { name: cream,       hex: "#f9e6c5" }
+    - { name: bark,        hex: "#8b5e34" }
+    - { name: soil,        hex: "#5a3a1a" }
+    - { name: lilac,       hex: "#9b6b9e" }
+    - { name: dusk,        hex: "#4a3f6b" }
+
+forbidden_features:
+  - antialiasing
+  - gradients
+  - text_in_sprite
+  - realistic_fur
+  - extra_limbs
+  - cropped_ears
+  - photographic_detail
+  - drop_shadow_blur
+
+lighting:
+  mode: palette_swap           # day/dusk/night via recolor, not blur filters
+  variants: [day, dusk, night]
+
+export:
+  format: png
+  bit_depth: 8
+  interlace: none
