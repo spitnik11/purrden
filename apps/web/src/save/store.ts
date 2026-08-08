@@ -242,6 +242,13 @@ export async function dispatch(
 
   if (!result) throw new Error("Could not acquire save lock");
   emit();
+  // Best-effort cloud outbox flush (no-op if not connected).
+  void import("../cloud/outbox")
+    .then((m) => m.maybeAutoFlush())
+    .then(() => emit())
+    .catch(() => {
+      /* ignore — UI can surface cloud.lastError */
+    });
   return result;
 }
 

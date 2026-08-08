@@ -20,9 +20,9 @@ License: **AGPL-3.0-or-later** (code). Design notes: [`docs/DESIGN-NOTES.md`](do
 | Phase 1 offline PWA | Playable (`apps/web`) |
 | Multi-tab focus locks + smoke | Done |
 | Docker web profile | Done |
-| **FastAPI command ledger + guest session** | **Started** |
+| FastAPI command ledger + guest session | Done |
 | Postgres models + Alembic | Done |
-| Browser ↔ API wire-up | Next |
+| **Browser outbox → /v1/sync** | **Done** |
 | Keycloak BFF cookies | Deferred (ADR 0004) |
 
 ## Layout
@@ -82,15 +82,22 @@ docker compose -f deploy/compose/docker-compose.yml --profile core up --build
 
 Desktop shortcuts (Windows): `Purrden-Local-Dev.bat` on your Desktop starts Vite + browser.
 
-### Phase 2 — API (local, no Docker)
+### Phase 2 — API + cloud from the PWA
 
 ```bash
+# terminal A — API
 cd apps/api
 pip install -r requirements.txt
-pytest tests/ -q
 uvicorn purrden_api.main:app --reload --port 8000
-# POST /v1/guest · GET /v1/bootstrap · POST /v1/sync
+
+# terminal B — web (proxies /api → :8000)
+cd apps/web
+npm run dev
+# Cloud save panel → Connect guest → play → Sync now
+npm run smoke:cloud   # optional; skips if API down
 ```
+
+Desktop: run **`Purrden-API-Dev.bat`** then **`Purrden-Local-Dev.bat`**.
 
 ### Phase 0 — domain / art factory
 

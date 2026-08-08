@@ -1,6 +1,14 @@
 import { cats, catLabel, plantById } from "../game/content";
 import { PLANTS, type WorldState } from "../game/types";
 import {
+  connectGuestCloud,
+  disconnectCloud,
+  flushOutbox,
+  getCloudInfo,
+  pullBootstrap,
+  type CloudInfo,
+} from "../cloud/outbox";
+import {
   dispatch,
   exportSaveJson,
   getStore,
@@ -19,6 +27,7 @@ let selectedSlot: number | null = null;
 let garden: GardenPixi | null = null;
 let tickTimer: number | null = null;
 let autoCompleteInFlight = false;
+let cloudInfo: CloudInfo | null = null;
 
 function $(sel: string, root: ParentNode = document): HTMLElement {
   const el = root.querySelector(sel);
@@ -75,13 +84,42 @@ function render(): void {
   const store = getStore();
   const { projection: p, focus, lastEvents, persistentStorage } = store;
 
+  const cloudBit = cloudInfo
+    ? cloudInfo.sessionId
+      ? ` · cloud ${cloudInfo.status}${cloudInfo.pendingCount ? ` (${cloudInfo.pendingCount} pending)` : ""}`
+      : " · cloud off"
+    : "";
   $("header .save-meta").textContent =
     `v${p.saveVersion} · energy ${p.growthEnergy} · food ${p.food} · streak ${p.streakDays}d · spawns ${p.pendingSpawnWindows}` +
     (persistentStorage === true
       ? " · persistent storage"
       : persistentStorage === false
         ? " · storage not persisted"
-        : "");
+        : "") +
+    cloudBit;
+
+  // Cloud panel
+  const cloudStatus = document.getElementById("cloud-status");
+  if (cloudStatus && cloudInfo) {
+    const api =
+      cloudInfo.apiReachable === true
+        ? "API up"
+        : cloudInfo.apiReachable === false
+          ? "API down"
+          : "API ?";
+    cloudStatus.textContent = cloudInfo.sessionId
+      ? `${cloudInfo.status} · ${api} · player ${cloudInfo.playerId?.slice(0, 8) ?? "?"}… · pending ${cloudInfo.pendingCount}` +
+        (cloudInfo.lastError ? ` · err: ${cloudInfo.lastError}` : "")
+      : `offline · ${api} — start Purrden-API-Dev.bat then Connect guest`;
+  }
+  const btnConnect = document.getElementById("btn-cloud-connect") as HTMLButtonElement | null;
+  const btnSync = document.getElementById("btn-cloud-sync") as HTMLButtonElement | null;
+  const btnPull = document.getElementById("btn-cloud-pull") as HTMLButtonElement | null;
+  const btnDisc = document.getElementById("btn-cloud-disconnect") as HTMLButtonElement | null;
+  if (btnConnect) btnConnect.disabled = !!cloudInfo?.sessionId;
+  if (btnSync) btnSync.disabled = !cloudInfo?.sessionId;
+  if (btnPull) btnPull.disabled = !cloudInfo?.sessionId;
+  if (btnDisc) btnDisc.disabled = !cloudInfo?.sessionId;
 
   // Timer
   const display = $("timer-display");
@@ -310,6 +348,19 @@ function mountShell(root: HTMLElement): void {
           <div class="dex-grid" id="dex-grid"></div>
         </section>
         <section class="panel">
+          <h2>Cloud save</h2>
+          <p class="muted" id="cloud-status">Checking…</p>
+          <div class="row" style="margin-top:0.5rem">
+            <button class="primary" id="btn-cloud-connect">Connect guest</button>
+            <button id="btn-cloud-sync">Sync now</button>
+            <button id="btn-cloud-pull">Pull bootstrap</button>
+            <button class="danger" id="btn-cloud-disconnect">Disconnect</button>
+          </div>
+          <p class="muted" style="margin-top:0.5rem">
+            Requires local API (Desktop: <code>Purrden-API-Dev.bat</code>). Connect creates a guest cloud account and flushes the outbox.
+          </p>
+        </section>
+        <section class="panel">
           <h2>Save</h2>
           <div class="row">
             <button id="btn-export">Export JSON</button>
@@ -381,11 +432,73 @@ function mountShell(root: HTMLElement): void {
       showError(e instanceof Error ? e.message : String(e));
     }
   });
+
+  $("#btn-cloud-connect").onclick = () => void cloudAction("connect");
+  $("#btn-cloud-sync").onclick = () => void cloudAction("sync");
+  $("#btn-cloud-pull").onclick = () => void cloudAction("pull");
+  $("#btn-cloud-disconnect").onclick = () => void cloudAction("disconnect");
+}
+
+async function refreshCloud(ping = false): Promise<void> {
+  try {
+    cloudInfo = await getCloudInfo({ ping });
+  } catch {
+    cloudInfo = {
+      status: "error",
+      sessionId: null,
+      playerId: null,
+      lastSuccessAt: null,
+      lastError: "cloud info failed",
+      pendingCount: 0,
+      lastAcceptedVersion: 0,
+      apiReachable: false,
+    };
+  }
+}
+
+async function cloudAction(kind: "connect" | "sync" | "pull" | "disconnect"): Promise<void> {
+  try {
+    clearError();
+    if (kind === "connect") {
+      cloudInfo = await connectGuestCloud();
+      const store = getStore();
+      store.lastEvents = [
+        `Cloud guest connected · flushed outbox`,
+        ...store.lastEvents,
+      ].slice(0, 12);
+    } else if (kind === "sync") {
+      const r = await flushOutbox();
+      const store = getStore();
+      store.lastEvents = [
+        `Cloud sync · sent ${r.sent} acked ${r.acked} rej ${r.rejected} dup ${r.dups}`,
+        ...store.lastEvents,
+      ].slice(0, 12);
+      cloudInfo = await getCloudInfo();
+    } else if (kind === "pull") {
+      if (!confirm("Replace local projection with cloud bootstrap? Unsynced local-only changes may be lost.")) {
+        return;
+      }
+      await pullBootstrap();
+      await reloadFromDb();
+      const store = getStore();
+      store.lastEvents = ["Pulled cloud bootstrap", ...store.lastEvents].slice(0, 12);
+      cloudInfo = await getCloudInfo();
+    } else {
+      await disconnectCloud();
+      cloudInfo = await getCloudInfo();
+      getStore().lastEvents = ["Cloud disconnected", ...getStore().lastEvents].slice(0, 12);
+    }
+  } catch (e) {
+    showError(e instanceof Error ? e.message : String(e));
+    await refreshCloud();
+  }
+  render();
 }
 
 export async function startApp(root: HTMLElement): Promise<void> {
   mountShell(root);
   await loadOrCreateStore();
+  await refreshCloud();
 
   garden = new GardenPixi($("#garden-host"), (index) => {
     selectedSlot = index;
@@ -396,13 +509,25 @@ export async function startApp(root: HTMLElement): Promise<void> {
   });
   await garden.init();
 
-  subscribe(render);
+  subscribe(() => {
+    void refreshCloud(false).finally(() => render());
+  });
   onBroadcast(async (msg) => {
-    if (msg.type === "SAVE_UPDATED" || msg.type === "FOCUS_UPDATED" || msg.type === "WORLD_UPDATED") {
+    if (
+      msg.type === "SAVE_UPDATED" ||
+      msg.type === "FOCUS_UPDATED" ||
+      msg.type === "WORLD_UPDATED" ||
+      msg.type === "SYNC_COMPLETE"
+    ) {
       await reloadFromDb();
+      await refreshCloud(false);
+      render();
     }
   });
 
+  // One API reachability ping at startup (not every render).
+  void refreshCloud(true).then(() => render());
   render();
   void selectedSlot;
 }
+

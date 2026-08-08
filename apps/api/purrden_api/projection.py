@@ -229,9 +229,8 @@ def apply_server_command(projection: dict[str, Any], cmd_type: str, payload: dic
         return proj
 
     if t == "world.advance_spawn":
-        # Phase 2 alpha: accept client-provided visitor payload if present;
-        # otherwise mark a pending window consumed without inventing a cat
-        # (Phase 3 runs authoritative spawn on workers).
+        # Phase 2 alpha: client embeds visitor from local deterministic spawn.
+        # Phase 3: authoritative worker spawn; client payload becomes untrusted.
         windows = int(proj.get("pendingSpawnWindows", 0))
         force = bool(payload.get("force"))
         if windows < 1 and not force:
@@ -241,10 +240,25 @@ def apply_server_command(projection: dict[str, Any], cmd_type: str, payload: dic
         visitor = payload.get("visitor")
         if visitor and isinstance(visitor, dict):
             slots = proj.get("slots", [])
-            free = next((s for s in slots if not s.get("visitor")), None)
-            if free is None:
+            slot_index = payload.get("slotIndex")
+            target = None
+            if slot_index is not None:
+                idx = int(slot_index)
+                if 0 <= idx < len(slots) and not slots[idx].get("visitor"):
+                    target = slots[idx]
+            if target is None:
+                target = next((s for s in slots if not s.get("visitor")), None)
+            if target is None:
                 raise CommandError("no_free_slot")
-            free["visitor"] = visitor
+            target["visitor"] = visitor
+            if isinstance(payload.get("pity"), dict):
+                proj["pity"] = payload["pity"]
+            cat_id = visitor.get("catId")
+            if cat_id:
+                recent = [cat_id] + [
+                    c for c in proj.get("recentCats", []) if c != cat_id
+                ]
+                proj["recentCats"] = recent[:8]
         return proj
 
     raise CommandError(f"unhandled:{t}")

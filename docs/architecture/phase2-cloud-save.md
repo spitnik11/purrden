@@ -39,6 +39,27 @@ uvicorn purrden_api.main:app --reload --app-dir apps/api
 docker compose -f deploy/compose/docker-compose.yml --profile core up --build
 ```
 
-## Not in this chunk
+## Browser wire-up (this chunk)
 
-Keycloak, RabbitMQ, Open-Meteo, Celery, browser→API wire-up in the PWA (next).
+PWA (`apps/web`):
+
+1. **Connect guest** → `POST /v1/guest` → store `sessionId` in Dexie preferences  
+2. **Outbox flush** → pending `pending_commands` → `POST /v1/sync` with `X-Purrden-Session`  
+3. Auto-flush after each local `dispatch` when connected  
+4. **Pull bootstrap** → replace local projection from `GET /v1/bootstrap` (confirm first)  
+5. Vite dev proxy: `/api/*` → `http://127.0.0.1:8000`
+
+Spawn commands embed `visitor` + `pity` in the payload so the server ledger can replay without server RNG (Phase 3 will own spawn).
+
+```bash
+# terminal A
+cd apps/api && uvicorn purrden_api.main:app --reload --port 8000
+# terminal B
+cd apps/web && npm run dev
+# UI: Cloud save → Connect guest → play → Sync now
+npm run smoke:cloud   # optional API integration smoke
+```
+
+## Not yet
+
+Keycloak, RabbitMQ, Open-Meteo, Celery, multi-device claim UX polish.

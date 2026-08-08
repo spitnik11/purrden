@@ -13,6 +13,14 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    proxy: {
+      // Dev: browser calls /api/* → local FastAPI (Purrden-API-Dev.bat)
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api/, ""),
+      },
+    },
   },
   plugins: [
     VitePWA({

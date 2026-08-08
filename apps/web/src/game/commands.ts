@@ -262,6 +262,8 @@ export async function applyCommand(
       // pity update already applied inside rollVisitor on proj
       proj.recentCats = [visitor.catId, ...proj.recentCats.filter((c) => c !== visitor.catId)].slice(0, 8);
       proj.lastSpawnAt = now;
+      // Embed visitor so cloud ledger can replay without server-side RNG (Phase 3).
+      payload = { ...payload, visitor, slotIndex: free.index, pity: proj.pity };
       events.push(
         `Visitor ${visitor.catId} arrived` +
           (visitor.explanation.length ? ` (${visitor.explanation.join(", ")})` : ""),
