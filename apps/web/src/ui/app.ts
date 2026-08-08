@@ -1,11 +1,14 @@
 import { cats, catLabel, plantById } from "../game/content";
 import { PLANTS, type WorldState } from "../game/types";
 import {
+  claimLocalAsCloud,
   connectGuestCloud,
   disconnectCloud,
   flushOutbox,
   getCloudInfo,
+  joinCloudSession,
   pullBootstrap,
+  reconcileCloud,
   type CloudInfo,
 } from "../cloud/outbox";
 import {
@@ -109,17 +112,27 @@ function render(): void {
           : "API ?";
     cloudStatus.textContent = cloudInfo.sessionId
       ? `${cloudInfo.status} · ${api} · player ${cloudInfo.playerId?.slice(0, 8) ?? "?"}… · pending ${cloudInfo.pendingCount}` +
+        (cloudInfo.deviceCount ? ` · devices ${cloudInfo.deviceCount}` : "") +
         (cloudInfo.lastError ? ` · err: ${cloudInfo.lastError}` : "")
-      : `offline · ${api} — start Purrden-API-Dev.bat then Connect guest`;
+      : `offline · ${api} — start API then connect / claim / join`;
   }
-  const btnConnect = document.getElementById("btn-cloud-connect") as HTMLButtonElement | null;
-  const btnSync = document.getElementById("btn-cloud-sync") as HTMLButtonElement | null;
-  const btnPull = document.getElementById("btn-cloud-pull") as HTMLButtonElement | null;
-  const btnDisc = document.getElementById("btn-cloud-disconnect") as HTMLButtonElement | null;
-  if (btnConnect) btnConnect.disabled = !!cloudInfo?.sessionId;
-  if (btnSync) btnSync.disabled = !cloudInfo?.sessionId;
-  if (btnPull) btnPull.disabled = !cloudInfo?.sessionId;
-  if (btnDisc) btnDisc.disabled = !cloudInfo?.sessionId;
+  const shareEl = document.getElementById("cloud-share-id") as HTMLInputElement | null;
+  if (shareEl && cloudInfo?.shareSessionId && cloudInfo.sessionId) {
+    shareEl.value = cloudInfo.shareSessionId;
+  }
+  const connected = !!cloudInfo?.sessionId;
+  const setDis = (id: string, dis: boolean) => {
+    const b = document.getElementById(id) as HTMLButtonElement | null;
+    if (b) b.disabled = dis;
+  };
+  setDis("btn-cloud-connect", connected);
+  setDis("btn-cloud-claim", connected);
+  setDis("btn-cloud-join", connected);
+  setDis("btn-cloud-sync", !connected);
+  setDis("btn-cloud-reconcile", !connected);
+  setDis("btn-cloud-pull", !connected);
+  setDis("btn-cloud-disconnect", !connected);
+  setDis("btn-cloud-copy-share", !connected);
 
   // Timer
   const display = $("timer-display");
@@ -351,13 +364,24 @@ function mountShell(root: HTMLElement): void {
           <h2>Cloud save</h2>
           <p class="muted" id="cloud-status">Checking…</p>
           <div class="row" style="margin-top:0.5rem">
-            <button class="primary" id="btn-cloud-connect">Connect guest</button>
+            <button class="primary" id="btn-cloud-claim">Claim local garden</button>
+            <button id="btn-cloud-connect">Empty guest</button>
+            <button id="btn-cloud-join">Join session…</button>
+          </div>
+          <div class="row" style="margin-top:0.5rem">
             <button id="btn-cloud-sync">Sync now</button>
+            <button id="btn-cloud-reconcile">Reconcile</button>
             <button id="btn-cloud-pull">Pull bootstrap</button>
             <button class="danger" id="btn-cloud-disconnect">Disconnect</button>
           </div>
+          <div class="row" style="margin-top:0.5rem">
+            <label class="muted" style="flex:1">Share session
+              <input id="cloud-share-id" readonly style="width:100%;margin-top:0.25rem;font-family:var(--mono);font-size:0.75rem;padding:0.35rem;border-radius:6px;border:1px solid #566c86;background:#111320;color:#f4f4f4" />
+            </label>
+            <button id="btn-cloud-copy-share" style="align-self:end">Copy</button>
+          </div>
           <p class="muted" style="margin-top:0.5rem">
-            Requires local API (Desktop: <code>Purrden-API-Dev.bat</code>). Connect creates a guest cloud account and flushes the outbox.
+            API on :8000 (Vite proxies <code>/api</code>). Claim uploads this garden as genesis; join pastes another browser’s share id for multi-device.
           </p>
         </section>
         <section class="panel">
@@ -434,9 +458,23 @@ function mountShell(root: HTMLElement): void {
   });
 
   $("#btn-cloud-connect").onclick = () => void cloudAction("connect");
+  $("#btn-cloud-claim").onclick = () => void cloudAction("claim");
+  $("#btn-cloud-join").onclick = () => void cloudAction("join");
   $("#btn-cloud-sync").onclick = () => void cloudAction("sync");
+  $("#btn-cloud-reconcile").onclick = () => void cloudAction("reconcile");
   $("#btn-cloud-pull").onclick = () => void cloudAction("pull");
   $("#btn-cloud-disconnect").onclick = () => void cloudAction("disconnect");
+  $("#btn-cloud-copy-share").onclick = async () => {
+    const id = cloudInfo?.shareSessionId;
+    if (!id) return;
+    try {
+      await navigator.clipboard.writeText(id);
+      getStore().lastEvents = ["Share session copied", ...getStore().lastEvents].slice(0, 12);
+      render();
+    } catch {
+      prompt("Copy this session id for the other browser:", id);
+    }
+  };
 }
 
 async function refreshCloud(ping = false): Promise<void> {
@@ -446,47 +484,63 @@ async function refreshCloud(ping = false): Promise<void> {
     cloudInfo = {
       status: "error",
       sessionId: null,
+      shareSessionId: null,
       playerId: null,
       lastSuccessAt: null,
       lastError: "cloud info failed",
       pendingCount: 0,
       lastAcceptedVersion: 0,
       apiReachable: false,
+      deviceCount: 0,
     };
   }
 }
 
-async function cloudAction(kind: "connect" | "sync" | "pull" | "disconnect"): Promise<void> {
+function pushEvent(msg: string): void {
+  const store = getStore();
+  store.lastEvents = [msg, ...store.lastEvents].slice(0, 12);
+}
+
+async function cloudAction(
+  kind: "connect" | "claim" | "join" | "sync" | "reconcile" | "pull" | "disconnect",
+): Promise<void> {
   try {
     clearError();
     if (kind === "connect") {
       cloudInfo = await connectGuestCloud();
-      const store = getStore();
-      store.lastEvents = [
-        `Cloud guest connected · flushed outbox`,
-        ...store.lastEvents,
-      ].slice(0, 12);
+      pushEvent("Cloud empty guest connected · outbox flushed");
+      await reloadFromDb();
+    } else if (kind === "claim") {
+      cloudInfo = await claimLocalAsCloud();
+      pushEvent("Local garden claimed as cloud genesis");
+      await reloadFromDb();
+    } else if (kind === "join") {
+      const id = prompt("Paste share session id from the other browser:");
+      if (!id?.trim()) return;
+      cloudInfo = await joinCloudSession(id.trim());
+      pushEvent(`Joined cloud session · pulled bootstrap`);
+      await reloadFromDb();
     } else if (kind === "sync") {
       const r = await flushOutbox();
-      const store = getStore();
-      store.lastEvents = [
-        `Cloud sync · sent ${r.sent} acked ${r.acked} rej ${r.rejected} dup ${r.dups}`,
-        ...store.lastEvents,
-      ].slice(0, 12);
+      pushEvent(`Cloud sync · sent ${r.sent} acked ${r.acked} rej ${r.rejected} dup ${r.dups}`);
       cloudInfo = await getCloudInfo();
+    } else if (kind === "reconcile") {
+      const msg = await reconcileCloud();
+      pushEvent(msg);
+      await reloadFromDb();
+      cloudInfo = await getCloudInfo({ ping: true });
     } else if (kind === "pull") {
       if (!confirm("Replace local projection with cloud bootstrap? Unsynced local-only changes may be lost.")) {
         return;
       }
       await pullBootstrap();
       await reloadFromDb();
-      const store = getStore();
-      store.lastEvents = ["Pulled cloud bootstrap", ...store.lastEvents].slice(0, 12);
+      pushEvent("Pulled cloud bootstrap");
       cloudInfo = await getCloudInfo();
     } else {
       await disconnectCloud();
       cloudInfo = await getCloudInfo();
-      getStore().lastEvents = ["Cloud disconnected", ...getStore().lastEvents].slice(0, 12);
+      pushEvent("Cloud disconnected");
     }
   } catch (e) {
     showError(e instanceof Error ? e.message : String(e));

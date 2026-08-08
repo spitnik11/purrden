@@ -1,6 +1,5 @@
 /**
- * Cloud outbox: flush Dexie pending_commands to POST /v1/sync.
- * Local projection stays authoritative until a successful flush acknowledges commands.
+ * Cloud outbox + multi-device claim/join/reconcile.
  */
 import type { GameProjection, PendingCommand } from "../game/types";
 import { broadcast, LockNames, withLock } from "../lib/locks";
@@ -8,8 +7,11 @@ import { db, simpleHash } from "../save/db";
 import { getStore } from "../save/store";
 import {
   bootstrap,
+  claimGuestGenesis,
   createGuest,
   health,
+  joinSession,
+  listDevices,
   syncCommands,
   type SyncCommandIn,
 } from "./client";
@@ -17,6 +19,7 @@ import {
 const PREF_SESSION = "cloud.sessionId";
 const PREF_PLAYER = "cloud.playerId";
 const PREF_CLOUD_DEVICE = "cloud.deviceId";
+const PREF_SHARE = "cloud.shareSessionId";
 
 export type CloudStatus =
   | "offline"
@@ -28,12 +31,15 @@ export type CloudStatus =
 export interface CloudInfo {
   status: CloudStatus;
   sessionId: string | null;
+  /** Session id safe to share with a second browser (join). */
+  shareSessionId: string | null;
   playerId: string | null;
   lastSuccessAt: number | null;
   lastError: string | null;
   pendingCount: number;
   lastAcceptedVersion: number;
   apiReachable: boolean | null;
+  deviceCount: number;
 }
 
 async function getPref<T>(key: string): Promise<T | null> {
@@ -49,12 +55,37 @@ async function clearPref(key: string): Promise<void> {
   await db.preferences.delete(key);
 }
 
+async function rememberSession(guest: {
+  session_id: string;
+  player_id: string;
+  device_id: string;
+  save_version: number;
+  /** Original session used for join (share code). */
+  share_session_id?: string;
+}): Promise<void> {
+  await setPref(PREF_SESSION, guest.session_id);
+  await setPref(PREF_PLAYER, guest.player_id);
+  await setPref(PREF_CLOUD_DEVICE, guest.device_id);
+  // For empty create / claim, share id is the session itself.
+  await setPref(PREF_SHARE, guest.share_session_id ?? guest.session_id);
+  await clearPref("cloud.lastError");
+  await db.sync_state.put({
+    id: "singleton",
+    serverCursor: null,
+    lastAcceptedVersion: guest.save_version,
+    lastSuccessAt: Date.now(),
+    backoffUntil: null,
+  });
+}
+
 export async function getCloudInfo(opts?: { ping?: boolean }): Promise<CloudInfo> {
   const sessionId = await getPref<string>(PREF_SESSION);
   const playerId = await getPref<string>(PREF_PLAYER);
+  const shareSessionId = await getPref<string>(PREF_SHARE);
   const sync = await db.sync_state.get("singleton");
   const pending = await db.pending_commands.where("state").equals("pending").count();
   let apiReachable: boolean | null = null;
+  let deviceCount = 0;
   if (opts?.ping) {
     try {
       await health();
@@ -63,20 +94,26 @@ export async function getCloudInfo(opts?: { ping?: boolean }): Promise<CloudInfo
       apiReachable = false;
     }
   }
+  if (sessionId && opts?.ping) {
+    try {
+      const devs = await listDevices(sessionId);
+      deviceCount = devs.devices.length;
+    } catch {
+      /* ignore */
+    }
+  }
   const lastError = (await getPref<string>("cloud.lastError")) ?? null;
   return {
-    status: !sessionId
-      ? "offline"
-      : lastError
-        ? "error"
-        : "connected",
+    status: !sessionId ? "offline" : lastError ? "error" : "connected",
     sessionId,
+    shareSessionId: shareSessionId ?? sessionId,
     playerId,
     lastSuccessAt: sync?.lastSuccessAt ?? null,
     lastError,
     pendingCount: pending,
     lastAcceptedVersion: sync?.lastAcceptedVersion ?? 0,
     apiReachable,
+    deviceCount,
   };
 }
 
@@ -84,6 +121,7 @@ export async function disconnectCloud(): Promise<void> {
   await clearPref(PREF_SESSION);
   await clearPref(PREF_PLAYER);
   await clearPref(PREF_CLOUD_DEVICE);
+  await clearPref(PREF_SHARE);
   await clearPref("cloud.lastError");
   await db.sync_state.put({
     id: "singleton",
@@ -94,27 +132,93 @@ export async function disconnectCloud(): Promise<void> {
   });
 }
 
-/**
- * Create a guest cloud account and attach this browser.
- * Then flush the local outbox so local actions become cloud state.
- */
+/** Empty cloud garden (fresh guest). */
 export async function connectGuestCloud(): Promise<CloudInfo> {
-  const guest = await createGuest();
-  await setPref(PREF_SESSION, guest.session_id);
-  await setPref(PREF_PLAYER, guest.player_id);
-  await setPref(PREF_CLOUD_DEVICE, guest.device_id);
-  await clearPref("cloud.lastError");
-  await db.sync_state.put({
-    id: "singleton",
-    serverCursor: null,
-    lastAcceptedVersion: guest.save_version,
-    lastSuccessAt: Date.now(),
-    backoffUntil: null,
+  const local = getStore().projection;
+  const guest = await createGuest({
+    deviceId: local.deviceId,
+    label: "browser",
   });
-
-  // Push local pending commands (and optionally rebuild server from them).
+  await rememberSession(guest);
   await flushOutbox();
-  return getCloudInfo();
+  return getCloudInfo({ ping: true });
+}
+
+/**
+ * Claim: upload sanitized local garden as cloud genesis, then flush any extra
+ * pending commands that still apply on top.
+ */
+export async function claimLocalAsCloud(): Promise<CloudInfo> {
+  const local = getStore().projection;
+  const guest = await claimGuestGenesis({
+    deviceId: local.deviceId,
+    label: "claim",
+    projection: local as unknown as Record<string, unknown>,
+  });
+  await rememberSession(guest);
+
+  // Align local save_version floor with server genesis
+  const proj = { ...local, saveVersion: Math.max(local.saveVersion, guest.save_version) };
+  const hash = await simpleHash(proj);
+  await db.save_snapshots.put({
+    localSaveId: proj.localSaveId,
+    schemaVersion: proj.schemaVersion,
+    contentVersion: proj.contentVersion,
+    saveVersion: proj.saveVersion,
+    projection: proj,
+    projectionHash: hash,
+    updatedAt: Date.now(),
+  });
+  broadcast({ type: "SAVE_UPDATED", saveVersion: proj.saveVersion });
+
+  // Pending commands still try to apply; dups/rejects are fine
+  try {
+    await flushOutbox(100);
+  } catch {
+    /* claim succeeded even if flush partial */
+  }
+  return getCloudInfo({ ping: true });
+}
+
+/**
+ * Second device: join with shared session id from device A, pull bootstrap.
+ */
+export async function joinCloudSession(shareSessionId: string): Promise<CloudInfo> {
+  const local = getStore().projection;
+  const guest = await joinSession({
+    sessionId: shareSessionId.trim(),
+    deviceId: local.deviceId,
+    label: "join",
+  });
+  await rememberSession({
+    ...guest,
+    share_session_id: shareSessionId.trim(),
+  });
+  await applyBootstrapProjection(guest.projection as unknown as GameProjection, guest.save_version);
+  return getCloudInfo({ ping: true });
+}
+
+/**
+ * Reconcile: flush local outbox, then if server is ahead, pull bootstrap.
+ * Returns a short status line for the event log.
+ */
+export async function reconcileCloud(): Promise<string> {
+  const sessionId = await getPref<string>(PREF_SESSION);
+  if (!sessionId) throw new Error("Not connected");
+
+  const flush = await flushOutbox(100);
+  const boot = await bootstrap(sessionId);
+  const sync = await db.sync_state.get("singleton");
+  const localKnown = sync?.lastAcceptedVersion ?? 0;
+
+  if (boot.save_version > localKnown || boot.save_version > getStore().projection.saveVersion) {
+    await applyBootstrapProjection(
+      boot.projection as unknown as GameProjection,
+      boot.save_version,
+    );
+    return `Reconciled · flushed ${flush.sent} · pulled server v${boot.save_version}`;
+  }
+  return `Reconciled · flushed ${flush.sent} acked ${flush.acked} · server v${boot.save_version} (already current)`;
 }
 
 function toSyncCommand(cmd: PendingCommand): SyncCommandIn {
@@ -128,11 +232,6 @@ function toSyncCommand(cmd: PendingCommand): SyncCommandIn {
   };
 }
 
-/**
- * Flush up to `limit` pending commands under the save lock.
- * Marks acked/rejected locally; does not replace local projection with server
- * (local is ahead optimistically). Server save_version tracked in sync_state.
- */
 export async function flushOutbox(limit = 50): Promise<{
   sent: number;
   acked: number;
@@ -141,7 +240,7 @@ export async function flushOutbox(limit = 50): Promise<{
 }> {
   const sessionId = await getPref<string>(PREF_SESSION);
   if (!sessionId) {
-    throw new Error("Not connected to cloud — use Connect guest first");
+    throw new Error("Not connected to cloud");
   }
 
   const result = await withLock(LockNames.save, async () => {
@@ -203,36 +302,26 @@ export async function flushOutbox(limit = 50): Promise<{
   return result;
 }
 
-/**
- * Replace local projection with cloud bootstrap (destructive to unsent local-only
- * state that never reached the server). Pending local commands that were not
- * flushed may still apply on next flush if they don't conflict.
- */
-export async function pullBootstrap(): Promise<GameProjection> {
-  const sessionId = await getPref<string>(PREF_SESSION);
-  if (!sessionId) throw new Error("Not connected");
-
-  const boot = await bootstrap(sessionId);
-  const projection = boot.projection as unknown as GameProjection;
-
-  // Preserve local device identity for new commands; keep installation secret.
+async function applyBootstrapProjection(
+  projection: GameProjection,
+  serverVersion: number,
+): Promise<void> {
   const local = getStore().projection;
   projection.deviceId = local.deviceId;
   projection.installationSecretHex = local.installationSecretHex;
   projection.localSaveId = local.localSaveId;
-  // Use max device sequence so new commands don't collide with cloud ledger
   projection.deviceSequence = Math.max(
     local.deviceSequence,
     Number(projection.deviceSequence) || 0,
   );
-  projection.saveVersion = Math.max(local.saveVersion, boot.save_version);
+  projection.saveVersion = Math.max(local.saveVersion, serverVersion);
 
   const hash = await simpleHash(projection);
   await db.transaction("rw", db.save_snapshots, db.sync_state, async () => {
     await db.save_snapshots.put({
       localSaveId: projection.localSaveId,
       schemaVersion: projection.schemaVersion ?? 1,
-      contentVersion: projection.contentVersion ?? boot.content_version,
+      contentVersion: projection.contentVersion ?? "2026.09.0",
       saveVersion: projection.saveVersion,
       projection,
       projectionHash: hash,
@@ -241,14 +330,20 @@ export async function pullBootstrap(): Promise<GameProjection> {
     await db.sync_state.put({
       id: "singleton",
       serverCursor: null,
-      lastAcceptedVersion: boot.save_version,
+      lastAcceptedVersion: serverVersion,
       lastSuccessAt: Date.now(),
       backoffUntil: null,
     });
   });
-
-  // Reload memory via store event — caller should reloadFromDb
   broadcast({ type: "SAVE_UPDATED", saveVersion: projection.saveVersion });
+}
+
+export async function pullBootstrap(): Promise<GameProjection> {
+  const sessionId = await getPref<string>(PREF_SESSION);
+  if (!sessionId) throw new Error("Not connected");
+  const boot = await bootstrap(sessionId);
+  const projection = boot.projection as unknown as GameProjection;
+  await applyBootstrapProjection(projection, boot.save_version);
   return projection;
 }
 
@@ -257,7 +352,6 @@ export async function setCloudError(msg: string | null): Promise<void> {
   else await clearPref("cloud.lastError");
 }
 
-/** After each local dispatch, best-effort background flush if connected. */
 export async function maybeAutoFlush(): Promise<void> {
   const sessionId = await getPref<string>(PREF_SESSION);
   if (!sessionId) return;

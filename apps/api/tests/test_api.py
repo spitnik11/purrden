@@ -138,3 +138,68 @@ def test_unauthorized_sync():
     c = client()
     r = c.post("/v1/sync", json={"knownSaveVersion": 0, "commands": []})
     assert r.status_code == 401
+
+
+def test_claim_genesis_and_join_second_device():
+    c = client()
+    # Claim a local-looking projection
+    genesis = {
+        "growthEnergy": 99,
+        "food": 3,
+        "gardenLevel": 2,
+        "plantInventory": {"plant:fern:v1": 5},
+        "slots": [
+            {"index": 0, "plantId": "plant:fern:v1", "visitor": None},
+            {"index": 1, "plantId": None, "visitor": None},
+            {"index": 2, "plantId": None, "visitor": None},
+            {"index": 3, "plantId": None, "visitor": None},
+        ],
+        "world": {"precipitation": "rain", "daylight": "dusk", "season": "autumn", "moon": "full"},
+        "collection": {
+            "cat:mizzle:v1": {
+                "catId": "cat:mizzle:v1",
+                "bond": 50,
+                "stage": "kitten",
+                "visitCount": 1,
+            }
+        },
+        "deviceSequence": 4,
+    }
+    claim = c.post(
+        "/v1/guest/claim",
+        json={"deviceId": "dev-a", "projection": genesis},
+    )
+    assert claim.status_code == 200, claim.text
+    body = claim.json()
+    assert body["save_version"] == 1
+    assert body["projection"]["slots"][0]["plantId"] == "plant:fern:v1"
+    assert body["projection"]["growthEnergy"] == 99
+    assert body["projection"]["installationSecretHex"] is None
+    share = body["session_id"]
+
+    # Second device joins
+    joined = c.post(
+        "/v1/session/join",
+        json={"sessionId": share, "deviceId": "dev-b", "label": "laptop"},
+    )
+    assert joined.status_code == 200, joined.text
+    j = joined.json()
+    assert j["joined"] is True
+    assert j["player_id"] == body["player_id"]
+    assert j["session_id"] != share  # new opaque token
+    assert j["projection"]["slots"][0]["plantId"] == "plant:fern:v1"
+
+    # Devices list
+    devs = c.get("/v1/devices", headers={"X-Purrden-Session": j["session_id"]})
+    assert devs.status_code == 200
+    ids = {d["device_id"] for d in devs.json()["devices"]}
+    assert "dev-a" in ids and "dev-b" in ids
+
+    # Sync from device B is idempotent with empty commands
+    s = c.post(
+        "/v1/sync",
+        headers={"X-Purrden-Session": j["session_id"]},
+        json={"knownSaveVersion": j["save_version"], "commands": []},
+    )
+    assert s.status_code == 200
+    assert s.json()["save_version"] == 1

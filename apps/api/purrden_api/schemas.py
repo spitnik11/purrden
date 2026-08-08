@@ -17,6 +17,41 @@ class GuestCreateOut(BaseModel):
     device_id: str
     save_version: int
     projection: dict[str, Any]
+    joined: bool = False
+
+
+class GuestCreateIn(BaseModel):
+    """Optional body for POST /v1/guest."""
+
+    deviceId: str | None = Field(default=None, max_length=64)
+    label: str | None = Field(default=None, max_length=64)
+
+
+class GuestClaimIn(BaseModel):
+    """Upload sanitized local garden as one-time cloud genesis."""
+
+    deviceId: str | None = Field(default=None, max_length=64)
+    label: str | None = Field(default="claim", max_length=64)
+    projection: dict[str, Any]
+
+
+class SessionJoinIn(BaseModel):
+    """Second device joins an existing guest cloud (share session id for alpha)."""
+
+    sessionId: str = Field(min_length=8, max_length=64)
+    deviceId: str | None = Field(default=None, max_length=64)
+    label: str | None = Field(default="join", max_length=64)
+
+
+class DeviceOut(BaseModel):
+    device_id: str
+    label: str | None = None
+    created_at: str | None = None
+
+
+class DeviceListOut(BaseModel):
+    player_id: str
+    devices: list[DeviceOut]
 
 
 class SyncCommandIn(BaseModel):

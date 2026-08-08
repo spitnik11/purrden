@@ -39,27 +39,24 @@ uvicorn purrden_api.main:app --reload --app-dir apps/api
 docker compose -f deploy/compose/docker-compose.yml --profile core up --build
 ```
 
-## Browser wire-up (this chunk)
+## Browser wire-up
 
-PWA (`apps/web`):
+1. **Claim local garden** → `POST /v1/guest/claim` (sanitized genesis)  
+2. **Empty guest** → `POST /v1/guest`  
+3. **Join session** → `POST /v1/session/join` with shared session id (second browser)  
+4. **Outbox flush / Reconcile** → `POST /v1/sync` then optional bootstrap pull if server ahead  
+5. **Devices** → `GET /v1/devices`  
+6. Vite proxy: `/api/*` → `http://127.0.0.1:8000`
 
-1. **Connect guest** → `POST /v1/guest` → store `sessionId` in Dexie preferences  
-2. **Outbox flush** → pending `pending_commands` → `POST /v1/sync` with `X-Purrden-Session`  
-3. Auto-flush after each local `dispatch` when connected  
-4. **Pull bootstrap** → replace local projection from `GET /v1/bootstrap` (confirm first)  
-5. Vite dev proxy: `/api/*` → `http://127.0.0.1:8000`
-
-Spawn commands embed `visitor` + `pity` in the payload so the server ledger can replay without server RNG (Phase 3 will own spawn).
+Genesis claim clamps energy/inventory, drops `installationSecretHex`, and only allows known plant/cat ids.
 
 ```bash
-# terminal A
 cd apps/api && uvicorn purrden_api.main:app --reload --port 8000
-# terminal B
 cd apps/web && npm run dev
-# UI: Cloud save → Connect guest → play → Sync now
-npm run smoke:cloud   # optional API integration smoke
+# Browser A: Claim local → Copy share session
+# Browser B: Join session… → paste id → Reconcile after play
 ```
 
 ## Not yet
 
-Keycloak, RabbitMQ, Open-Meteo, Celery, multi-device claim UX polish.
+Keycloak, RabbitMQ, Open-Meteo, Celery.

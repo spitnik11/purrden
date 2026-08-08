@@ -17,6 +17,7 @@ export interface GuestCreateOut {
   device_id: string;
   save_version: number;
   projection: Record<string, unknown>;
+  joined?: boolean;
 }
 
 export interface BootstrapOut {
@@ -90,8 +91,42 @@ async function request<T>(
   return data as T;
 }
 
-export function createGuest(): Promise<GuestCreateOut> {
-  return request<GuestCreateOut>("/v1/guest", { method: "POST" });
+export function createGuest(body?: {
+  deviceId?: string;
+  label?: string;
+}): Promise<GuestCreateOut> {
+  return request<GuestCreateOut>("/v1/guest", {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
+}
+
+export function claimGuestGenesis(body: {
+  deviceId?: string;
+  label?: string;
+  projection: Record<string, unknown>;
+}): Promise<GuestCreateOut> {
+  return request<GuestCreateOut>("/v1/guest/claim", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function joinSession(body: {
+  sessionId: string;
+  deviceId?: string;
+  label?: string;
+}): Promise<GuestCreateOut> {
+  return request<GuestCreateOut>("/v1/session/join", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listDevices(
+  sessionId: string,
+): Promise<{ player_id: string; devices: { device_id: string; label?: string }[] }> {
+  return request("/v1/devices", { method: "GET" }, sessionId);
 }
 
 export function bootstrap(sessionId: string): Promise<BootstrapOut> {
