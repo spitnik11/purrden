@@ -4,7 +4,11 @@
 #   docker compose -f deploy/compose/docker-compose.yml --profile web up --build
 #   open http://127.0.0.1:8080
 #
-# Later profiles (not started yet): core (api+postgres), async, auth, cache, observability
+# Phase 2 (api + postgres + web):
+#   docker compose -f deploy/compose/docker-compose.yml --profile core up --build
+#   API http://127.0.0.1:8000/docs  ·  Web http://127.0.0.1:8080
+#
+# Later: async, auth, cache, observability
 
 name: purrden
 
@@ -18,3 +22,41 @@ services:
     ports:
       - "8080:80"
     restart: unless-stopped
+
+  postgres:
+    profiles: ["core"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: purrden
+      POSTGRES_PASSWORD: purrden
+      POSTGRES_DB: purrden
+    ports:
+      - "5432:5432"
+    volumes:
+      - purrden_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U purrden -d purrden"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    profiles: ["core"]
+    build:
+      context: ../..
+      dockerfile: deploy/containers/api.Dockerfile
+    image: purrden-api:local
+    environment:
+      DATABASE_URL: postgresql+psycopg://purrden:purrden@postgres:5432/purrden
+      ENV: dev
+      CORS_ORIGINS: http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:8080
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  purrden_pg:

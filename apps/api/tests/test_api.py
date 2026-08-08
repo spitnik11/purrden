@@ -1,0 +1,140 @@
+"""API tests — SQLite in-memory, no Postgres required."""
+from __future__ import annotations
+
+import os
+
+os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
+os.environ["ENV"] = "test"
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from purrden_api.config import get_settings  # noqa: E402
+from purrden_api.db import Base, engine, init_db  # noqa: E402
+from purrden_api.main import create_app  # noqa: E402
+
+
+def setup_function(_function=None):  # noqa: ANN001
+    get_settings.cache_clear()
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
+
+def client() -> TestClient:
+    # Lifespan also calls init_db; tables already created in setup_function.
+    return TestClient(create_app())
+
+
+def test_health():
+    c = client()
+    r = c.get("/health")
+    assert r.status_code == 200
+    assert r.json()["status"] == "ok"
+
+
+def test_guest_bootstrap_and_sync_idempotent():
+    c = client()
+    g = c.post("/v1/guest")
+    assert g.status_code == 200, g.text
+    body = g.json()
+    session = body["session_id"]
+    device = body["device_id"]
+    headers = {"X-Purrden-Session": session}
+
+    boot = c.get("/v1/bootstrap", headers=headers)
+    assert boot.status_code == 200
+    assert boot.json()["save_version"] == 0
+
+    cmd = {
+        "commandId": "cmd-plant-1",
+        "deviceId": device,
+        "deviceSequence": 1,
+        "baseSaveVersion": 0,
+        "type": "garden.plant_place",
+        "payload": {"slotIndex": 0, "plantId": "plant:fern:v1"},
+    }
+    s1 = c.post(
+        "/v1/sync",
+        headers=headers,
+        json={"knownSaveVersion": 0, "commands": [cmd]},
+    )
+    assert s1.status_code == 200, s1.text
+    j1 = s1.json()
+    assert j1["acks"][0]["status"] == "applied"
+    assert j1["save_version"] == 1
+    assert j1["projection"]["slots"][0]["plantId"] == "plant:fern:v1"
+
+    s2 = c.post(
+        "/v1/sync",
+        headers=headers,
+        json={"knownSaveVersion": 1, "commands": [cmd]},
+    )
+    assert s2.status_code == 200
+    j2 = s2.json()
+    assert j2["acks"][0]["status"] == "dup"
+    assert j2["save_version"] == 1
+
+
+def test_focus_complete_idempotent_energy():
+    c = client()
+    g = c.post("/v1/guest").json()
+    headers = {"X-Purrden-Session": g["session_id"]}
+    device = g["device_id"]
+    energy0 = g["projection"]["growthEnergy"]
+
+    def sync(commands, known=0):
+        return c.post(
+            "/v1/sync",
+            headers=headers,
+            json={"knownSaveVersion": known, "commands": commands},
+        ).json()
+
+    r1 = sync(
+        [
+            {
+                "commandId": "f-start",
+                "deviceId": device,
+                "deviceSequence": 1,
+                "baseSaveVersion": 0,
+                "type": "focus.start",
+                "payload": {"seconds": 60},
+            },
+            {
+                "commandId": "f-done",
+                "deviceId": device,
+                "deviceSequence": 2,
+                "baseSaveVersion": 0,
+                "type": "focus.complete",
+                "payload": {},
+            },
+        ]
+    )
+    assert r1["acks"][0]["status"] == "applied"
+    assert r1["acks"][1]["status"] == "applied"
+    energy = r1["projection"]["growthEnergy"]
+    spawns = r1["projection"]["pendingSpawnWindows"]
+    assert energy > energy0
+    assert spawns >= 1
+
+    # Second complete (already rewarded) → applied as no-op, no extra energy
+    r2 = sync(
+        [
+            {
+                "commandId": "f-done-2",
+                "deviceId": device,
+                "deviceSequence": 3,
+                "baseSaveVersion": r1["save_version"],
+                "type": "focus.complete",
+                "payload": {},
+            }
+        ],
+        known=r1["save_version"],
+    )
+    assert r2["acks"][0]["status"] == "applied"
+    assert r2["projection"]["growthEnergy"] == energy
+    assert r2["projection"]["pendingSpawnWindows"] == spawns
+
+
+def test_unauthorized_sync():
+    c = client()
+    r = c.post("/v1/sync", json={"knownSaveVersion": 0, "commands": []})
+    assert r.status_code == 401

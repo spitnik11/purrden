@@ -64,3 +64,27 @@ jobs:
 
       - name: Typecheck & production build
         run: npm run build
+
+  phase2-api:
+    name: Phase 2 · API tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Pytest
+        env:
+          DATABASE_URL: sqlite+pysqlite:///:memory:
+          ENV: test
+        run: pytest tests/ -q

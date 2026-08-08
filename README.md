@@ -12,18 +12,18 @@ integration, and scalable cloud deployment.**
 
 License: **AGPL-3.0-or-later** (code). Design notes: [`docs/DESIGN-NOTES.md`](docs/DESIGN-NOTES.md).
 
-## Status: Phase 1 — Offline vertical slice (in progress)
+## Status: Phase 2 — Cloud-save alpha (started)
 
 | Gate | State |
 |---|---|
-| Dual-runtime spawn engine (JS + Python) | Done · 121 goldens |
-| Focus-session state machine | Done (TS + Python) |
-| Art Factory dry-run pipeline | Done |
-| **Vite PWA + Pixi garden + Dexie saves** | **In progress (this slice)** |
-| Offline focus → plant → spawn → feed/collect → reload | Playable locally |
-| Multi-tab Web Locks + BroadcastChannel | Done |
-| JSON export/import | Done |
-| Live ComfyUI art promotion | Optional workstation path |
+| Phase 0 spawn + art factory | Done |
+| Phase 1 offline PWA | Playable (`apps/web`) |
+| Multi-tab focus locks + smoke | Done |
+| Docker web profile | Done |
+| **FastAPI command ledger + guest session** | **Started** |
+| Postgres models + Alembic | Done |
+| Browser ↔ API wire-up | Next |
+| Keycloak BFF cookies | Deferred (ADR 0004) |
 
 ## Layout
 
@@ -68,11 +68,28 @@ npm run smoke   # pure offline-loop regression (no browser)
 npm run build   # production + service worker
 ```
 
-Docker (static nginx image, no backend):
+Docker:
 
 ```bash
+# static web only
 docker compose -f deploy/compose/docker-compose.yml --profile web up --build
 # open http://127.0.0.1:8080
+
+# web + API + Postgres (Phase 2)
+docker compose -f deploy/compose/docker-compose.yml --profile core up --build
+# API docs http://127.0.0.1:8000/docs
+```
+
+Desktop shortcuts (Windows): `Purrden-Local-Dev.bat` on your Desktop starts Vite + browser.
+
+### Phase 2 — API (local, no Docker)
+
+```bash
+cd apps/api
+pip install -r requirements.txt
+pytest tests/ -q
+uvicorn purrden_api.main:app --reload --port 8000
+# POST /v1/guest · GET /v1/bootstrap · POST /v1/sync
 ```
 
 ### Phase 0 — domain / art factory
