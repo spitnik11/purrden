@@ -87,4 +87,5 @@ jobs:
         env:
           DATABASE_URL: "sqlite+pysqlite:///:memory:"
           ENV: test
-        run: pytest tests/ -q
+          PYTHONPATH: .
+        run: python -m pytest tests/ -q
