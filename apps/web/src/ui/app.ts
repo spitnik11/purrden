@@ -24,6 +24,7 @@ import {
 import { elapsedSeconds } from "@domain/focus-session.mjs";
 import { GardenPixi } from "./garden-pixi";
 import { onBroadcast } from "../lib/locks";
+import { $, $maybe, shellReady } from "./dom";
 
 let selectedPlantId: string = PLANTS[0].id;
 let selectedSlot: number | null = null;
@@ -31,12 +32,6 @@ let garden: GardenPixi | null = null;
 let tickTimer: number | null = null;
 let autoCompleteInFlight = false;
 let cloudInfo: CloudInfo | null = null;
-
-function $(sel: string, root: ParentNode = document): HTMLElement {
-  const el = root.querySelector(sel);
-  if (!el) throw new Error(`Missing ${sel}`);
-  return el as HTMLElement;
-}
 
 function formatTime(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -84,6 +79,18 @@ function clearError() {
 }
 
 function render(): void {
+  // Subscribe may fire before mountShell finishes wiring — never hard-crash the app.
+  if (!shellReady()) return;
+
+  try {
+    renderShell();
+  } catch (e) {
+    console.error("render failed", e);
+    showError(e instanceof Error ? e.message : String(e));
+  }
+}
+
+function renderShell(): void {
   const store = getStore();
   const { projection: p, focus, lastEvents, persistentStorage } = store;
 
@@ -92,17 +99,20 @@ function render(): void {
       ? ` · cloud ${cloudInfo.status}${cloudInfo.pendingCount ? ` (${cloudInfo.pendingCount} pending)` : ""}`
       : " · cloud off"
     : "";
-  $("header .save-meta").textContent =
-    `v${p.saveVersion} · energy ${p.growthEnergy} · food ${p.food} · streak ${p.streakDays}d · spawns ${p.pendingSpawnWindows}` +
-    (persistentStorage === true
-      ? " · persistent storage"
-      : persistentStorage === false
-        ? " · storage not persisted"
-        : "") +
-    cloudBit;
+  const saveMeta = $maybe("header .save-meta");
+  if (saveMeta) {
+    saveMeta.textContent =
+      `v${p.saveVersion} · energy ${p.growthEnergy} · food ${p.food} · streak ${p.streakDays}d · spawns ${p.pendingSpawnWindows}` +
+      (persistentStorage === true
+        ? " · persistent storage"
+        : persistentStorage === false
+          ? " · storage not persisted"
+          : "") +
+      cloudBit;
+  }
 
   // Cloud panel
-  const cloudStatus = document.getElementById("cloud-status");
+  const cloudStatus = $maybe("cloud-status");
   if (cloudStatus && cloudInfo) {
     const api =
       cloudInfo.apiReachable === true
@@ -116,13 +126,13 @@ function render(): void {
         (cloudInfo.lastError ? ` · err: ${cloudInfo.lastError}` : "")
       : `offline · ${api} — start API then connect / claim / join`;
   }
-  const shareEl = document.getElementById("cloud-share-id") as HTMLInputElement | null;
+  const shareEl = $maybe("cloud-share-id") as HTMLInputElement | null;
   if (shareEl && cloudInfo?.shareSessionId && cloudInfo.sessionId) {
     shareEl.value = cloudInfo.shareSessionId;
   }
   const connected = !!cloudInfo?.sessionId;
   const setDis = (id: string, dis: boolean) => {
-    const b = document.getElementById(id) as HTMLButtonElement | null;
+    const b = $maybe(id) as HTMLButtonElement | null;
     if (b) b.disabled = dis;
   };
   setDis("btn-cloud-connect", connected);
@@ -134,9 +144,12 @@ function render(): void {
   setDis("btn-cloud-disconnect", !connected);
   setDis("btn-cloud-copy-share", !connected);
 
-  // Timer
+  // Timer — must use #id (or bare id via normalizeSelector)
   const display = $("timer-display");
-  const remaining = focus ? focusRemaining() : Number(($("#focus-minutes") as HTMLSelectElement).value) * 60;
+  const focusMinutes = $maybe("focus-minutes") as HTMLSelectElement | null;
+  const remaining = focus
+    ? focusRemaining()
+    : Number(focusMinutes?.value ?? 25) * 60;
   if (focus?.state === "running") {
     display.className = "timer-display running";
     display.textContent = formatTime(focusRemaining());

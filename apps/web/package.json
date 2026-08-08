@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "smoke": "tsx src/game/loop-smoke.ts",
-    "smoke:cloud": "tsx src/cloud/sync-smoke.ts"
+    "smoke:cloud": "tsx src/cloud/sync-smoke.ts",
+    "smoke:dom": "tsx src/ui/dom.test.ts"
   },
   "dependencies": {
     "dexie": "^4.4.4",
