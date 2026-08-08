@@ -7,7 +7,7 @@ on:
 
 jobs:
   phase0-domain:
-    name: Phase 0 · domain & art
+    name: phase0-domain-art
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Spawn engine conformance (JS ↔ Python)
+      - name: Spawn engine conformance
         run: python tools/conformance.py
 
       - name: Spawn property invariants
@@ -35,14 +35,14 @@ jobs:
       - name: Art license registry present
         run: python tools/art-factory/cli/art.py licenses | head -n 5
 
-      - name: Art Factory unit tests (dry-run pipeline)
+      - name: Art Factory unit tests
         run: python tools/art-factory/tests/test_art_factory.py
 
-      - name: Comfy workflow validate (offline)
+      - name: Comfy workflow validate
         run: python tools/art-factory/cli/art.py comfy validate
 
   phase1-web:
-    name: Phase 1 · web build
+    name: phase1-web-build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -62,11 +62,11 @@ jobs:
       - name: Offline loop smoke
         run: npm run smoke
 
-      - name: Typecheck & production build
+      - name: Typecheck and production build
         run: npm run build
 
   phase2-api:
-    name: Phase 2 · API tests
+    name: phase2-api-tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -85,6 +85,6 @@ jobs:
 
       - name: Pytest
         env:
-          DATABASE_URL: sqlite+pysqlite:///:memory:
+          DATABASE_URL: "sqlite+pysqlite:///:memory:"
           ENV: test
         run: pytest tests/ -q
