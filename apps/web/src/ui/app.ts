@@ -8,6 +8,7 @@ import {
   loadOrCreateStore,
   reloadFromDb,
   subscribe,
+  tryAutoCompleteFocus,
 } from "../save/store";
 import { elapsedSeconds } from "@domain/focus-session.mjs";
 import { GardenPixi } from "./garden-pixi";
@@ -17,6 +18,7 @@ let selectedPlantId: string = PLANTS[0].id;
 let selectedSlot: number | null = null;
 let garden: GardenPixi | null = null;
 let tickTimer: number | null = null;
+let autoCompleteInFlight = false;
 
 function $(sel: string, root: ParentNode = document): HTMLElement {
   const el = root.querySelector(sel);
@@ -188,14 +190,33 @@ function render(): void {
 
   garden?.render(p);
 
-  // Keep ticking while focus running
-  if (focus?.state === "running" && tickTimer == null) {
-    tickTimer = window.setInterval(() => render(), 250);
+  // Keep ticking while focus running/paused (pause still needs wall-clock for resume UI)
+  const needsTick = focus?.state === "running" || focus?.state === "paused";
+  if (needsTick && tickTimer == null) {
+    tickTimer = window.setInterval(() => {
+      void tickFocus();
+    }, 250);
   }
-  if (focus?.state !== "running" && tickTimer != null) {
+  if (!needsTick && tickTimer != null) {
     clearInterval(tickTimer);
     tickTimer = null;
   }
+}
+
+async function tickFocus(): Promise<void> {
+  const { focus } = getStore();
+  if (focus?.state === "running" && !autoCompleteInFlight) {
+    const remaining = focusRemaining();
+    if (remaining <= 0) {
+      autoCompleteInFlight = true;
+      try {
+        await tryAutoCompleteFocus();
+      } finally {
+        autoCompleteInFlight = false;
+      }
+    }
+  }
+  render();
 }
 
 function mountShell(root: HTMLElement): void {
@@ -239,6 +260,7 @@ function mountShell(root: HTMLElement): void {
           </div>
           <p class="muted" style="margin-top:0.75rem">
             Timer uses persisted timestamps — closing the tab is safe. Completing awards growth energy and a spawn window.
+            Auto-completes when time hits zero; multi-tab locks prevent double rewards.
           </p>
         </section>
         <section class="panel">

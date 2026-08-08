@@ -1,0 +1,20 @@
+# Purrden local stack — profiles grow by phase.
+#
+# Phase 1 (web only):
+#   docker compose -f deploy/compose/docker-compose.yml --profile web up --build
+#   open http://127.0.0.1:8080
+#
+# Later profiles (not started yet): core (api+postgres), async, auth, cache, observability
+
+name: purrden
+
+services:
+  web:
+    profiles: ["web", "core"]
+    build:
+      context: ../..
+      dockerfile: deploy/containers/web.Dockerfile
+    image: purrden-web:local
+    ports:
+      - "8080:80"
+    restart: unless-stopped

@@ -38,7 +38,14 @@ Every player action:
 5. commit IndexedDB transaction  
 6. paint UI  
 
-Multi-tab: `navigator.locks` on `purrden:save` + `BroadcastChannel` refresh.
+Multi-tab:
+
+- `navigator.locks` on `purrden:save` for every command
+- nested `purrden:focus:<id>` for complete/cancel
+- rehydrate projection + focus from IndexedDB **before** apply
+- `focus.complete` is idempotent (`rewarded` flag → no second energy/spawn)
+- timer auto-completes at zero (single-tab guard + locks)
+- `BroadcastChannel` refreshes other tabs
 
 ## Content IDs
 

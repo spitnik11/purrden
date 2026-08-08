@@ -63,8 +63,16 @@ cd apps/web
 npm install
 npm run dev
 # open http://127.0.0.1:5173
-# loop: Start focus (3s dev) → Complete → plant → set rain → Advance spawn → feed/collect
+# loop: Start focus (3s dev) → auto-completes → plant → set rain → Advance spawn → feed/collect
+npm run smoke   # pure offline-loop regression (no browser)
 npm run build   # production + service worker
+```
+
+Docker (static nginx image, no backend):
+
+```bash
+docker compose -f deploy/compose/docker-compose.yml --profile web up --build
+# open http://127.0.0.1:8080
 ```
 
 ### Phase 0 — domain / art factory

@@ -118,33 +118,45 @@ export async function applyCommand(
     }
     case "focus.complete": {
       if (!focus) throw new Error("No focus session");
+      // Idempotent: already rewarded → no second energy/spawn (multi-tab safe).
+      if (focus.rewarded || focus.state === FocusState.COMPLETED) {
+        focus = {
+          ...focus,
+          state: FocusState.COMPLETED,
+          rewarded: true,
+          runningSince: null,
+          updatedAt: now,
+          completedAt: focus.completedAt ?? now,
+        };
+        proj.activeFocusId = null;
+        events.push("Focus already completed (no duplicate reward)");
+        break;
+      }
       const before = toDomainFocus(focus);
       const after = completeFocus(before, now);
       if (after.state !== FocusState.COMPLETED) {
         throw new Error("Focus target not reached yet");
       }
-      focus = fromDomainFocus(after, focus.rewarded);
-      if (!focus.rewarded) {
-        const energy = growthEnergyFor(after);
-        proj.growthEnergy += energy;
-        focus.rewarded = true;
-        // Streak
-        const day = dayKey(now);
-        if (proj.lastFocusCompletedDay) {
-          const prev = new Date(proj.lastFocusCompletedDay + "T00:00:00Z").getTime();
-          const cur = new Date(day + "T00:00:00Z").getTime();
-          const diffDays = Math.round((cur - prev) / 86_400_000);
-          if (diffDays === 1) proj.streakDays += 1;
-          else if (diffDays > 1) proj.streakDays = 1;
-          // same day: keep streak
-        } else {
-          proj.streakDays = 1;
-        }
-        proj.lastFocusCompletedDay = day;
-        // Each completed focus queues a spawn window
-        proj.pendingSpawnWindows += 1;
-        events.push(`Focus complete · +${energy} growth energy · spawn window ready`);
+      focus = fromDomainFocus(after, false);
+      const energy = growthEnergyFor(after);
+      proj.growthEnergy += energy;
+      focus.rewarded = true;
+      // Streak
+      const day = dayKey(now);
+      if (proj.lastFocusCompletedDay) {
+        const prev = new Date(proj.lastFocusCompletedDay + "T00:00:00Z").getTime();
+        const cur = new Date(day + "T00:00:00Z").getTime();
+        const diffDays = Math.round((cur - prev) / 86_400_000);
+        if (diffDays === 1) proj.streakDays += 1;
+        else if (diffDays > 1) proj.streakDays = 1;
+        // same day: keep streak
+      } else {
+        proj.streakDays = 1;
       }
+      proj.lastFocusCompletedDay = day;
+      // Each completed focus queues a spawn window
+      proj.pendingSpawnWindows += 1;
+      events.push(`Focus complete · +${energy} growth energy · spawn window ready`);
       proj.activeFocusId = null;
       break;
     }

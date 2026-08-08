@@ -26,5 +26,6 @@
       "@domain/*": ["../../packages/domain-ts/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/game/loop-smoke.ts"]
 }

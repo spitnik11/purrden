@@ -59,5 +59,8 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Offline loop smoke
+        run: npm run smoke
+
       - name: Typecheck & production build
         run: npm run build

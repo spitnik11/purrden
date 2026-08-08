@@ -19,6 +19,9 @@ export interface GameStore {
 let memory: GameStore | null = null;
 const listeners = new Set<() => void>();
 
+/** Serialize nested locks: focus complete always takes save lock; optional focus id lock. */
+let completingFocusIds = new Set<string>();
+
 export function getStore(): GameStore {
   if (!memory) throw new Error("Store not loaded");
   return memory;
@@ -31,6 +34,29 @@ export function subscribe(fn: () => void): () => void {
 
 function emit() {
   for (const fn of listeners) fn();
+}
+
+/** Read latest projection + active focus from IndexedDB (authoritative under multi-tab). */
+export async function readLatestFromDb(): Promise<{
+  projection: GameProjection;
+  focus: FocusSessionRecord | null;
+} | null> {
+  const rows = await db.save_snapshots.orderBy("updatedAt").reverse().limit(1).toArray();
+  if (!rows.length) return null;
+  const snap = rows[0];
+  let focus: FocusSessionRecord | null = null;
+  if (snap.projection.activeFocusId) {
+    focus = (await db.focus_sessions.get(snap.projection.activeFocusId)) ?? null;
+  } else if (memory?.focus?.id) {
+    // completed focus may still be wanted for display
+    focus = (await db.focus_sessions.get(memory.focus.id)) ?? null;
+    if (focus && focus.state !== "running" && focus.state !== "paused") {
+      // keep completed for one-shot display
+    } else if (!snap.projection.activeFocusId) {
+      focus = focus?.state === "completed" || focus?.state === "cancelled" ? focus : null;
+    }
+  }
+  return { projection: snap.projection, focus };
 }
 
 export async function loadOrCreateStore(): Promise<GameStore> {
@@ -96,81 +122,165 @@ export async function loadOrCreateStore(): Promise<GameStore> {
   return memory;
 }
 
+async function persistApplied(
+  current: GameStore,
+  applied: Awaited<ReturnType<typeof applyCommand>>,
+): Promise<GameStore> {
+  const pending: PendingCommand = {
+    ...applied.command,
+    state: "pending",
+  };
+  const hash = await simpleHash(applied.projection);
+  const snap: SaveSnapshotRow = {
+    localSaveId: applied.projection.localSaveId,
+    schemaVersion: applied.projection.schemaVersion,
+    contentVersion: applied.projection.contentVersion,
+    saveVersion: applied.projection.saveVersion,
+    projection: applied.projection,
+    projectionHash: hash,
+    updatedAt: applied.projection.updatedAt,
+  };
+
+  await db.transaction(
+    "rw",
+    db.save_snapshots,
+    db.pending_commands,
+    db.focus_sessions,
+    async () => {
+      await db.pending_commands.put(pending);
+      await db.save_snapshots.put(snap);
+      if (applied.focus) {
+        await db.focus_sessions.put(applied.focus);
+      }
+    },
+  );
+
+  const next: GameStore = {
+    projection: applied.projection,
+    focus: applied.focus,
+    lastEvents: applied.events,
+    persistentStorage: current.persistentStorage,
+  };
+  memory = next;
+  broadcast({ type: "SAVE_UPDATED", saveVersion: applied.projection.saveVersion });
+  if (applied.command.type.startsWith("focus.")) {
+    broadcast({
+      type: "FOCUS_UPDATED",
+      focusSessionId: applied.focus?.id ?? "",
+    });
+  }
+  if (applied.command.type.startsWith("world.")) {
+    broadcast({ type: "WORLD_UPDATED" });
+  }
+  return next;
+}
+
 /**
- * Apply a command in one IDB transaction:
- * append pending command + update projection + focus + bump sequences.
+ * Apply a command in one IDB transaction under Web Locks.
+ * Rehydrates projection/focus from IndexedDB before apply so multi-tab
+ * cannot double-award focus completion.
  */
 export async function dispatch(
   type: CommandType,
   payload: Record<string, unknown> = {},
 ): Promise<GameStore> {
   if (!memory) await loadOrCreateStore();
+
+  const focusIdForLock =
+    type === "focus.complete" || type === "focus.pause" || type === "focus.cancel" || type === "focus.resume"
+      ? memory!.focus?.id ?? memory!.projection.activeFocusId
+      : type === "focus.start"
+        ? null
+        : null;
+
+  const runApply = async (): Promise<GameStore> => {
+    // Always re-read under the save lock (latest wins).
+    const latest = await readLatestFromDb();
+    const baseProjection = latest?.projection ?? memory!.projection;
+    let baseFocus = latest?.focus ?? memory!.focus;
+
+    // For complete: prefer focus row by active id even if memory is stale
+    if (type === "focus.complete" && baseProjection.activeFocusId) {
+      const row = await db.focus_sessions.get(baseProjection.activeFocusId);
+      if (row) baseFocus = row;
+    }
+
+    // In-memory guard against concurrent complete in same tab
+    if (type === "focus.complete" && baseFocus?.id) {
+      if (completingFocusIds.has(baseFocus.id)) {
+        return memory!;
+      }
+      completingFocusIds.add(baseFocus.id);
+    }
+
+    try {
+      const applied = await applyCommand(baseProjection, baseFocus, type, payload);
+      return await persistApplied(memory!, applied);
+    } finally {
+      if (type === "focus.complete" && baseFocus?.id) {
+        completingFocusIds.delete(baseFocus.id);
+      }
+    }
+  };
+
+  // Nest focus lock inside save lock for completion/control paths.
   const result = await withLock(LockNames.save, async () => {
-    const current = memory!;
-    const applied = await applyCommand(
-      current.projection,
-      current.focus,
-      type,
-      payload,
-    );
-
-    const pending: PendingCommand = {
-      ...applied.command,
-      state: "pending",
-    };
-    const hash = await simpleHash(applied.projection);
-    const snap: SaveSnapshotRow = {
-      localSaveId: applied.projection.localSaveId,
-      schemaVersion: applied.projection.schemaVersion,
-      contentVersion: applied.projection.contentVersion,
-      saveVersion: applied.projection.saveVersion,
-      projection: applied.projection,
-      projectionHash: hash,
-      updatedAt: applied.projection.updatedAt,
-    };
-
-    await db.transaction(
-      "rw",
-      db.save_snapshots,
-      db.pending_commands,
-      db.focus_sessions,
-      async () => {
-        await db.pending_commands.put(pending);
-        await db.save_snapshots.put(snap);
-        if (applied.focus) {
-          await db.focus_sessions.put(applied.focus);
-        } else if (current.focus) {
-          // keep last focus record for history but clear active
-          await db.focus_sessions.put({
-            ...current.focus,
-            state: current.focus.state,
-          });
+    if (focusIdForLock && (type === "focus.complete" || type === "focus.cancel")) {
+      const nested = await withLock(LockNames.focus(focusIdForLock), runApply);
+      if (nested === null) {
+        // Another tab holds the focus lock — rehydrate and surface no-op.
+        await reloadFromDb();
+        if (memory?.focus?.rewarded || memory?.focus?.state === "completed") {
+          return memory;
         }
-      },
-    );
-
-    memory = {
-      projection: applied.projection,
-      focus: applied.focus,
-      lastEvents: applied.events,
-      persistentStorage: current.persistentStorage,
-    };
-    broadcast({ type: "SAVE_UPDATED", saveVersion: applied.projection.saveVersion });
-    if (type.startsWith("focus.")) {
-      broadcast({
-        type: "FOCUS_UPDATED",
-        focusSessionId: applied.focus?.id ?? "",
-      });
+        throw new Error("Focus is being completed in another tab");
+      }
+      return nested;
     }
-    if (type.startsWith("world.")) {
-      broadcast({ type: "WORLD_UPDATED" });
-    }
-    return memory;
+    return runApply();
   });
 
   if (!result) throw new Error("Could not acquire save lock");
   emit();
   return result;
+}
+
+/**
+ * Auto-complete when wall clock shows target reached.
+ * Uses ifAvailable focus lock so only one tab awards the reward.
+ */
+export async function tryAutoCompleteFocus(): Promise<boolean> {
+  if (!memory?.focus) return false;
+  const focus = memory.focus;
+  if (focus.state !== "running" && focus.state !== "paused") return false;
+  if (focus.rewarded) return false;
+
+  const { elapsedSeconds } = await import("@domain/focus-session.mjs");
+  const elapsed = elapsedSeconds(
+    {
+      id: focus.id,
+      state: focus.state,
+      targetSeconds: focus.targetSeconds,
+      startedAt: focus.startedAt,
+      runningSince: focus.runningSince,
+      accumulatedMs: focus.accumulatedMs,
+      completedAt: focus.completedAt,
+      cancelledAt: focus.cancelledAt,
+      source: focus.source,
+      updatedAt: focus.updatedAt,
+    },
+    Date.now(),
+  );
+  if (elapsed < focus.targetSeconds) return false;
+
+  try {
+    await dispatch("focus.complete");
+    return true;
+  } catch {
+    // Another tab won, or not ready after rehydrate
+    await reloadFromDb();
+    return false;
+  }
 }
 
 export async function exportSaveJson(): Promise<string> {
@@ -234,18 +344,16 @@ export async function importSaveJson(text: string): Promise<GameStore> {
 }
 
 export async function reloadFromDb(): Promise<void> {
-  const rows = await db.save_snapshots.orderBy("updatedAt").reverse().limit(1).toArray();
-  if (!rows.length || !memory) return;
-  const snap = rows[0];
-  let focus: FocusSessionRecord | null = null;
-  if (snap.projection.activeFocusId) {
-    focus = (await db.focus_sessions.get(snap.projection.activeFocusId)) ?? null;
-  }
+  const latest = await readLatestFromDb();
+  if (!latest || !memory) return;
   memory = {
     ...memory,
-    projection: snap.projection,
-    focus,
-    lastEvents: ["Synced from another tab"],
+    projection: latest.projection,
+    focus: latest.focus,
+    lastEvents:
+      latest.projection.saveVersion !== memory.projection.saveVersion
+        ? ["Synced from another tab"]
+        : memory.lastEvents,
   };
   emit();
 }
