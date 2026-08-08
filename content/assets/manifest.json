@@ -1,0 +1,85 @@
+{
+  "version": "2026.09.0",
+  "styleBible": "style:purrden-core:v1",
+  "pixel": {
+    "cat": { "width": 32, "height": 32, "baselineY": 29 },
+    "plant": { "width": 16, "height": 16 },
+    "sampling": "nearest"
+  },
+  "cats": {
+    "cat:tabby:v1": {
+      "label": "Tabby",
+      "body": "sand",
+      "accent": "bark",
+      "outline": "ink",
+      "eye": "ink",
+      "silhouette": "compact",
+      "stages": {
+        "kitten": { "scale": 0.85 },
+        "cat": { "scale": 1.0 }
+      }
+    },
+    "cat:sol:v1": {
+      "label": "Sol",
+      "body": "gold",
+      "accent": "clay",
+      "outline": "ink",
+      "eye": "ink",
+      "silhouette": "lounging",
+      "stages": {
+        "kitten": { "scale": 0.85 },
+        "sunbask": { "scale": 1.0 }
+      }
+    },
+    "cat:mizzle:v1": {
+      "label": "Mizzle",
+      "body": "mist",
+      "accent": "cool_blue",
+      "outline": "ink",
+      "eye": "deep",
+      "silhouette": "round",
+      "stages": {
+        "kitten": { "scale": 0.85 },
+        "raincoat": { "scale": 1.0 }
+      }
+    },
+    "cat:luna:v1": {
+      "label": "Luna",
+      "body": "cloud",
+      "accent": "lilac",
+      "outline": "ink",
+      "eye": "dusk",
+      "silhouette": "tall",
+      "stages": {
+        "kitten": { "scale": 0.85 },
+        "moonlit": { "scale": 1.0 }
+      }
+    }
+  },
+  "plants": {
+    "plant:fern:v1": {
+      "label": "Fern",
+      "primary": "moss",
+      "accent": "leaf",
+      "shape": "fern"
+    },
+    "plant:pond:v1": {
+      "label": "Pond",
+      "primary": "sky",
+      "accent": "ice",
+      "shape": "pond"
+    },
+    "plant:sunny_rock:v1": {
+      "label": "Sunny rock",
+      "primary": "bark",
+      "accent": "sand",
+      "shape": "rock"
+    },
+    "plant:flower:v1": {
+      "label": "Flower",
+      "primary": "rose",
+      "accent": "leaf",
+      "shape": "flower"
+    }
+  }
+}

@@ -22,7 +22,9 @@ License: **AGPL-3.0-or-later** (code). Design notes: [`docs/DESIGN-NOTES.md`](do
 | Docker web profile | Done |
 | FastAPI command ledger + guest session | Done |
 | Postgres models + Alembic | Done |
-| **Browser outbox → /v1/sync** | **Done** |
+| Browser outbox → /v1/sync | Done |
+| Multi-device claim / join / reconcile | Done |
+| **Content-ID placeholder atlas (Pixi nearest)** | **Done** |
 | Keycloak BFF cookies | Deferred (ADR 0004) |
 
 ## Layout
