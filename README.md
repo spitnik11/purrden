@@ -12,20 +12,18 @@ integration, and scalable cloud deployment.**
 
 License: **AGPL-3.0-or-later** (code). Design notes: [`docs/DESIGN-NOTES.md`](docs/DESIGN-NOTES.md).
 
-## Status: Phase 0 — Foundations (in progress)
+## Status: Phase 1 — Offline vertical slice (in progress)
 
 | Gate | State |
 |---|---|
-| Dual-runtime spawn engine (JS + Python) | Working |
-| Cross-runtime golden vectors | Expanding toward ≥100 |
-| Focus-session state machine | Working (TS + Python) |
-| Content IDs + style bible + 4 cat specs | Done |
-| Model license registry (RAIL++-M approved) | Done |
-| `art models scan` + hard QA CLI | Done |
-| ComfyUI client boundary + constrained SDXL workflow | Done |
-| Pixel repair chain + Art Factory state machine | Done (dry-run E2E) |
-| Live ComfyUI generation (optional) | Available via `art job --live` when Comfy is up |
-| Full Phase-0 exit (live promote + content polish) | In progress |
+| Dual-runtime spawn engine (JS + Python) | Done · 121 goldens |
+| Focus-session state machine | Done (TS + Python) |
+| Art Factory dry-run pipeline | Done |
+| **Vite PWA + Pixi garden + Dexie saves** | **In progress (this slice)** |
+| Offline focus → plant → spawn → feed/collect → reload | Playable locally |
+| Multi-tab Web Locks + BroadcastChannel | Done |
+| JSON export/import | Done |
+| Live ComfyUI art promotion | Optional workstation path |
 
 ## Layout
 
@@ -54,34 +52,29 @@ purrden/
 └─ docs/
 ```
 
-## Run (Phase 0)
+## Run
 
-Requires **Node 18+** and **Python 3.10+**. No build step yet.
+Requires **Node 20+** and **Python 3.10+**.
+
+### Phase 1 — playable offline PWA
 
 ```bash
-# regenerate integer exp LUT (rarely needed)
-python tools/gen_exp_lut.py
+cd apps/web
+npm install
+npm run dev
+# open http://127.0.0.1:5173
+# loop: Start focus (3s dev) → Complete → plant → set rain → Advance spawn → feed/collect
+npm run build   # production + service worker
+```
 
-# expand golden contexts (≥100)
-python tools/gen_contexts.py
+### Phase 0 — domain / art factory
 
-# prove JS and Python spawn engines agree (the Phase-0 engine gate)
+```bash
 python tools/conformance.py
-
-# property invariants + focus unit tests
 python tools/test_property_spawn.py
 python tools/test_focus.py
-
-# art factory
 pip install -r tools/art-factory/requirements.txt
-python tools/art-factory/cli/art.py licenses
-python tools/art-factory/cli/art.py models scan
-python tools/art-factory/cli/art.py plan art/specs/cat-mizzle-v1.yaml
-python tools/art-factory/cli/art.py job art/specs/cat-mizzle-v1.yaml --promote
 python tools/art-factory/tests/test_art_factory.py
-# optional live (ComfyUI on 127.0.0.1:8188):
-# python tools/art-factory/cli/art.py comfy ping
-# python tools/art-factory/cli/art.py job art/specs/cat-mizzle-v1.yaml --live
 ```
 
 

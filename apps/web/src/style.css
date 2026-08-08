@@ -1,0 +1,248 @@
+:root {
+  color-scheme: dark;
+  --bg: #1a1c2c;
+  --panel: #29366f;
+  --panel-2: #333c57;
+  --ink: #f4f4f4;
+  --muted: #94b0c2;
+  --accent: #41a6f6;
+  --good: #a7f070;
+  --warn: #ffcd75;
+  --bad: #b13e53;
+  --leaf: #38b764;
+  --radius: 10px;
+  --font: "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: radial-gradient(ellipse at top, #29366f 0%, var(--bg) 55%);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+#app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
+}
+
+header.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+}
+
+header .tag {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 800px) {
+  .grid {
+    grid-template-columns: 1.2fr 0.8fr;
+  }
+}
+
+.panel {
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  border-radius: var(--radius);
+  padding: 1rem;
+  backdrop-filter: blur(6px);
+}
+
+.panel h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: var(--warn);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.chip {
+  background: var(--panel-2);
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+  font-family: var(--mono);
+}
+
+.chip strong {
+  color: var(--good);
+}
+
+.timer-display {
+  font-family: var(--mono);
+  font-size: 2.5rem;
+  text-align: center;
+  margin: 0.5rem 0 1rem;
+  letter-spacing: 0.06em;
+}
+
+.timer-display.running {
+  color: var(--good);
+}
+.timer-display.paused {
+  color: var(--warn);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+button,
+select,
+label.file-btn {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--muted) 40%, transparent);
+  background: var(--panel-2);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #1a1c2c;
+  font-weight: 600;
+}
+
+button.danger {
+  background: var(--bad);
+  border-color: transparent;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.slots-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.slots-list li {
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.log {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  max-height: 8rem;
+  overflow: auto;
+  background: #111320;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin: 0;
+}
+
+.log li {
+  margin: 0.15rem 0;
+}
+
+.plant-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.plant-picker button.active {
+  outline: 2px solid var(--good);
+}
+
+#garden-host {
+  min-height: 200px;
+  display: flex;
+  justify-content: center;
+}
+
+.dex-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.dex-card {
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.error-banner {
+  background: color-mix(in srgb, var(--bad) 35%, transparent);
+  border: 1px solid var(--bad);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}

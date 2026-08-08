@@ -7,6 +7,7 @@ __pycache__/
 venv/
 dist/
 build/
+apps/web/dev-dist/
 .coverage
 htmlcov/
 .pytest_cache/
