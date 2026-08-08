@@ -21,8 +21,11 @@ License: **AGPL-3.0-or-later** (code). Design notes: [`docs/DESIGN-NOTES.md`](do
 | Focus-session state machine | Working (TS + Python) |
 | Content IDs + style bible + 4 cat specs | Done |
 | Model license registry (RAIL++-M approved) | Done |
-| `art models scan` + hard QA CLI | Scaffolded |
-| Full Phase-0 exit (end-to-end art job + 100 goldens) | In progress |
+| `art models scan` + hard QA CLI | Done |
+| ComfyUI client boundary + constrained SDXL workflow | Done |
+| Pixel repair chain + Art Factory state machine | Done (dry-run E2E) |
+| Live ComfyUI generation (optional) | Available via `art job --live` when Comfy is up |
+| Full Phase-0 exit (live promote + content polish) | In progress |
 
 ## Layout
 
@@ -69,11 +72,18 @@ python tools/conformance.py
 python tools/test_property_spawn.py
 python tools/test_focus.py
 
-# art factory: license registry / model scan / hard QA
+# art factory
+pip install -r tools/art-factory/requirements.txt
 python tools/art-factory/cli/art.py licenses
 python tools/art-factory/cli/art.py models scan
-# python tools/art-factory/cli/art.py qa path/to/32x32.png
+python tools/art-factory/cli/art.py plan art/specs/cat-mizzle-v1.yaml
+python tools/art-factory/cli/art.py job art/specs/cat-mizzle-v1.yaml --promote
+python tools/art-factory/tests/test_art_factory.py
+# optional live (ComfyUI on 127.0.0.1:8188):
+# python tools/art-factory/cli/art.py comfy ping
+# python tools/art-factory/cli/art.py job art/specs/cat-mizzle-v1.yaml --live
 ```
+
 
 Optional: copy [`.env.example`](.env.example) → `.env` and set `PURRDEN_ART_MODEL_ROOT` to your
 local ComfyUI weights directory. **Never commit weights.**

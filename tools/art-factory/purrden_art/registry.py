@@ -116,6 +116,10 @@ def apply_license(record: ModelRecord, overrides: dict[str, dict]) -> ModelRecor
             record.shipping_status = meta.get(
                 "shipping_status", record.shipping_status
             )
+            # Prefer explicit role from the project license registry.
+            role = meta.get("role")
+            if role in {"checkpoint", "lora", "vae", "upscaler", "controlnet"}:
+                record.role = role
             break
     return record
 

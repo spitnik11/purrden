@@ -28,5 +28,14 @@ jobs:
       - name: Focus state machine
         run: python tools/test_focus.py
 
+      - name: Install Art Factory deps
+        run: pip install -r tools/art-factory/requirements.txt
+
       - name: Art license registry present
         run: python tools/art-factory/cli/art.py licenses | head -n 5
+
+      - name: Art Factory unit tests (dry-run pipeline)
+        run: python tools/art-factory/tests/test_art_factory.py
+
+      - name: Comfy workflow validate (offline)
+        run: python tools/art-factory/cli/art.py comfy validate
