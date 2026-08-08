@@ -44,3 +44,8 @@ Thumbs.db
 # Large generated work products
 *.blend
 *.aseprite
+
+# Local API sqlite files
+apps/api/*.db
+apps/api/*.db-*
+
