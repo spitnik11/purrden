@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     weather_base_url: str = "https://api.open-meteo.com/v1/forecast"
     public_url: str = "http://127.0.0.1:8000"
     keycloak_url: str = "http://127.0.0.1:8081"
+    keycloak_internal_url: str = "http://keycloak:8080"
     keycloak_realm: str = "purrden"
     keycloak_client_id: str = "purrden-web"
     keycloak_client_secret: str = ""

@@ -14,6 +14,8 @@ COPY apps/scheduler /app/apps/scheduler
 COPY packages/spawn-engine-py /packages/spawn-engine-py
 COPY packages/domain-python /packages/domain-python
 ENV PYTHONPATH=/app:/packages/spawn-engine-py:/packages/domain-python
+RUN useradd --create-home --uid 10001 purrden
+USER purrden
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \

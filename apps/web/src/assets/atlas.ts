@@ -36,15 +36,6 @@ export function getCatTexture(catId: string, stage = "kitten"): Texture | null {
   const key = frameKey(catId, stage, "idle");
   let tex = textureCache.get(key);
   if (tex) return tex;
-  const realFrame = realCatFrames[key];
-  if (realFrame) {
-    const loaded = Texture.from(realFrame);
-    if (loaded) {
-      if (loaded.source) loaded.source.scaleMode = "nearest";
-      textureCache.set(key, loaded);
-      return loaded;
-    }
-  }
   const scale = visual.stages[stage]?.scale ?? visual.stages.kitten?.scale ?? 1;
   const canvas = drawCatPlaceholder(visual, scale);
   tex = canvasToNearestTexture(canvas);

@@ -1,0 +1,17 @@
+{
+  "realm": "purrden",
+  "enabled": true,
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "clients": [{
+    "clientId": "purrden-web",
+    "name": "Purrden Web",
+    "enabled": true,
+    "publicClient": true,
+    "standardFlowEnabled": true,
+    "directAccessGrantsEnabled": false,
+    "redirectUris": ["http://127.0.0.1:8000/v1/auth/callback"],
+    "webOrigins": ["http://127.0.0.1:8080", "http://127.0.0.1:5173"],
+    "attributes": { "pkce.code.challenge.method": "S256" }
+  }]
+}

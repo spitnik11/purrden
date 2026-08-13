@@ -44,13 +44,13 @@ def callback(request: Request, code: str, state: str, db: Session = Depends(get_
     s = get_settings()
     if not request.cookies.get("purrden_oidc_state") or not secrets.compare_digest(state, request.cookies["purrden_oidc_state"]):
         raise HTTPException(status_code=400, detail="invalid_oidc_state")
-    token_url = f"{s.keycloak_url}/realms/{s.keycloak_realm}/protocol/openid-connect/token"
+    token_url = f"{s.keycloak_internal_url}/realms/{s.keycloak_realm}/protocol/openid-connect/token"
     data = {"grant_type": "authorization_code", "client_id": s.keycloak_client_id, "code": code, "redirect_uri": f"{s.public_url}/v1/auth/callback", "code_verifier": request.cookies.get("purrden_oidc_verifier", "")}
     if s.keycloak_client_secret:
         data["client_secret"] = s.keycloak_client_secret
     with httpx.Client(timeout=5) as client:
         token = client.post(token_url, data=data); token.raise_for_status()
-        user = client.get(f"{s.keycloak_url}/realms/{s.keycloak_realm}/protocol/openid-connect/userinfo", headers={"Authorization": f"Bearer {token.json()['access_token']}"}); user.raise_for_status()
+        user = client.get(f"{s.keycloak_internal_url}/realms/{s.keycloak_realm}/protocol/openid-connect/userinfo", headers={"Authorization": f"Bearer {token.json()['access_token']}"}); user.raise_for_status()
     identity = user.json()
     player = db.scalar(select(Player).where(Player.oidc_subject == identity["sub"]))
     claim_session = db.get(BffSession, request.cookies.get("purrden_claim_session", ""))
