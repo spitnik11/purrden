@@ -25,7 +25,7 @@ License: **AGPL-3.0-or-later** (code). Design notes: [`docs/DESIGN-NOTES.md`](do
 | Browser outbox → /v1/sync | Done |
 | Multi-device claim / join / reconcile | Done |
 | **Content-ID placeholder atlas (Pixi nearest)** | **Done** |
-| Keycloak BFF cookies | Deferred (ADR 0004) |
+| Keycloak BFF cookies, CSRF, named-account claims | Done |
 
 ## Layout
 

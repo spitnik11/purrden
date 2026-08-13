@@ -15,7 +15,7 @@ services:
       KEYCLOAK_URL: ${KEYCLOAK_URL:?Set KEYCLOAK_URL}
       KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
       COOKIE_SECURE: "true"
-      CORS_ORIGINS: ${PUBLIC_URL:?Set PUBLIC_URL}
+      CORS_ORIGINS: ${WEB_ORIGIN:?Set WEB_ORIGIN}
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:?Set TRUSTED_HOSTS}
     ports: []
 
@@ -26,8 +26,14 @@ services:
     ports: []
 
   keycloak:
+    command: start --import-realm --http-enabled=true --proxy-headers=xforwarded
     environment:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME: ${KEYCLOAK_URL:?Set KEYCLOAK_URL}
+      KC_DB: postgres
+      KC_DB_URL: ${KEYCLOAK_DATABASE_URL:?Set KEYCLOAK_DATABASE_URL}
+      KC_DB_USERNAME: ${KEYCLOAK_DATABASE_USER:?Set KEYCLOAK_DATABASE_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DATABASE_PASSWORD:?Set KEYCLOAK_DATABASE_PASSWORD}
     ports: []
 
   worker:

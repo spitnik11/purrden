@@ -12,8 +12,11 @@ POST /v1/sync           → append commands, server re-validates, bump save_vers
 
 ## Auth (this chunk)
 
-Guest **opaque BFF session** via header `X-Purrden-Session`.  
-Keycloak + cookie sessions remain Phase 2 follow-up (not blocking the ledger).
+Guest and named accounts use opaque, server-side sessions. Browsers receive an HttpOnly BFF
+cookie plus a readable CSRF cookie; unsafe requests require the matching CSRF header and an
+allowed same-origin request. Keycloak authorization-code callbacks claim guest state into the
+named account without exposing provider tokens to the browser. The legacy session header remains
+available for non-browser clients.
 
 ## Idempotency
 
@@ -57,6 +60,6 @@ cd apps/web && npm run dev
 # Browser B: Join session… → paste id → Reconcile after play
 ```
 
-## Not yet
+## Next
 
-Keycloak, RabbitMQ, Open-Meteo, Celery.
+Production restore drills, external TLS/proxy verification, and sustained load testing.

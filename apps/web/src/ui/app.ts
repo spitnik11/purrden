@@ -444,8 +444,10 @@ function mountShell(root: HTMLElement): void {
     gardenPanel.prepend(nav);
     root.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;
+      const opener = nav.querySelector<HTMLButtonElement>('button[aria-expanded="true"]');
       side.querySelectorAll<HTMLElement>(".menu-panel").forEach((item) => (item.hidden = true));
       nav.querySelectorAll("button").forEach((item) => item.setAttribute("aria-expanded", "false"));
+      opener?.focus();
     });
   }
 
