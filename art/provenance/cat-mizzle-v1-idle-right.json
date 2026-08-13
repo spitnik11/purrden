@@ -1,0 +1,20 @@
+{
+  "assetId": "cat:mizzle:v1",
+  "frame": "idle-right",
+  "generatedAt": "2026-08-13T11:30:05Z",
+  "studioGenerationId": "68aa4b8c-7326-4355-b960-88a35a81827c",
+  "seed": 1847,
+  "checkpoint": {
+    "name": "pixelArtDiffusionXL_spriteShaper.safetensors",
+    "sha256": "7adffa28d4003a773c2d4e5f10ae1ba63c33573967864a7f9a4a3be9c9f04a93"
+  },
+  "loras": [{
+    "name": "ArsMJStyleSDXL_-_Pixel_Art.safetensors",
+    "strength": 0.8,
+    "sha256": "d10351f5259d2afbe3b334a936f2007c1a53ca5c680046c75ab7bf6ef2909b4e"
+  }],
+  "settings": { "width": 1024, "height": 1024, "steps": 24, "cfg": 6, "sampler": "euler_ancestral", "scheduler": "simple" },
+  "repair": "nearest-neighbor crop, Purrden palette quantization, binary alpha, 32x32 baseline composition",
+  "qa": { "passed": true, "opaqueColors": 15, "maxColors": 24, "binaryAlpha": true, "baselineY": 29 },
+  "outputSha256": "2c041279e78ec1f375a69e6169bf91fb3f9d6346ab595f57fe5ef36efde836b0"
+}

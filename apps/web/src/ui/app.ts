@@ -92,23 +92,10 @@ function render(): void {
 
 function renderShell(): void {
   const store = getStore();
-  const { projection: p, focus, lastEvents, persistentStorage } = store;
-
-  const cloudBit = cloudInfo
-    ? cloudInfo.sessionId
-      ? ` · cloud ${cloudInfo.status}${cloudInfo.pendingCount ? ` (${cloudInfo.pendingCount} pending)` : ""}`
-      : " · cloud off"
-    : "";
+  const { projection: p, focus, lastEvents } = store;
   const saveMeta = $maybe("header .save-meta");
   if (saveMeta) {
-    saveMeta.textContent =
-      `v${p.saveVersion} · energy ${p.growthEnergy} · food ${p.food} · streak ${p.streakDays}d · spawns ${p.pendingSpawnWindows}` +
-      (persistentStorage === true
-        ? " · persistent storage"
-        : persistentStorage === false
-          ? " · storage not persisted"
-          : "") +
-      cloudBit;
+    saveMeta.textContent = `Energy ${p.growthEnergy} · Food ${p.food} · Visits ${p.pendingSpawnWindows}`;
   }
 
   // Cloud panel
@@ -413,6 +400,52 @@ function mountShell(root: HTMLElement): void {
     </div>
   `;
 
+  const menuLabels = ["Focus", "World", "Cat dex", "Cloud save", "Save"];
+  const side = root.querySelector(".grid > div:last-child");
+  const gardenPanel = root.querySelector(".grid > .panel");
+  if (side && gardenPanel) {
+    gardenPanel.classList.add("game-stage");
+    const nav = document.createElement("nav");
+    nav.className = "game-menu";
+    nav.setAttribute("aria-label", "Game menus");
+    [...side.querySelectorAll<HTMLElement>(":scope > .panel")].forEach((panel, index) => {
+      const id = `menu-panel-${index}`;
+      panel.id = id;
+      panel.classList.add("menu-panel");
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "false");
+      panel.setAttribute("aria-label", menuLabels[index] ?? `Menu ${index + 1}`);
+      panel.hidden = true;
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "menu-close";
+      close.setAttribute("aria-label", "Close menu");
+      close.textContent = "Close";
+      close.onclick = () => { panel.hidden = true; button.setAttribute("aria-expanded", "false"); button.focus(); };
+      panel.prepend(close);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = menuLabels[index] ?? `Menu ${index + 1}`;
+      button.setAttribute("aria-controls", id);
+      button.setAttribute("aria-expanded", "false");
+      button.onclick = () => {
+        const opening = panel.hidden;
+        side.querySelectorAll<HTMLElement>(".menu-panel").forEach((item) => (item.hidden = true));
+        nav.querySelectorAll("button").forEach((item) => item.setAttribute("aria-expanded", "false"));
+        panel.hidden = !opening;
+        button.setAttribute("aria-expanded", String(opening));
+        if (opening) panel.querySelector<HTMLElement>("button, select, input")?.focus();
+      };
+      nav.append(button);
+    });
+    gardenPanel.prepend(nav);
+    root.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      side.querySelectorAll<HTMLElement>(".menu-panel").forEach((item) => (item.hidden = true));
+      nav.querySelectorAll("button").forEach((item) => item.setAttribute("aria-expanded", "false"));
+    });
+  }
+
   const picker = $("#plant-picker");
   for (const plant of PLANTS) {
     const b = document.createElement("button");
@@ -597,4 +630,3 @@ export async function startApp(root: HTMLElement): Promise<void> {
   render();
   void selectedSlot;
 }
-

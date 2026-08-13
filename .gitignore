@@ -14,6 +14,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .turbo/
+.worktrees/
 *.tsbuildinfo
 
 # Env & secrets

@@ -3,7 +3,7 @@
  * When real atlases ship under public/assets/, loaders can swap here without
  * touching saves (IDs stay stable).
  */
-import { Texture } from "pixi.js";
+import { Assets, Texture } from "pixi.js";
 import {
   assetManifest,
   catVisual,
@@ -13,6 +13,10 @@ import {
 import { drawCatPlaceholder, drawPlantPlaceholder } from "./placeholder-draw";
 
 const textureCache = new Map<string, Texture>();
+const realCatFrames: Record<string, string> = {
+  [frameKey("cat:mizzle:v1", "kitten", "idle")]: "/assets/cats/mizzle-idle-right.png",
+  [frameKey("cat:mizzle:v1", "raincoat", "idle")]: "/assets/cats/mizzle-idle-right.png",
+};
 
 function canvasToNearestTexture(canvas: HTMLCanvasElement): Texture {
   const texture = Texture.from(canvas);
@@ -32,6 +36,15 @@ export function getCatTexture(catId: string, stage = "kitten"): Texture | null {
   const key = frameKey(catId, stage, "idle");
   let tex = textureCache.get(key);
   if (tex) return tex;
+  const realFrame = realCatFrames[key];
+  if (realFrame) {
+    const loaded = Texture.from(realFrame);
+    if (loaded) {
+      if (loaded.source) loaded.source.scaleMode = "nearest";
+      textureCache.set(key, loaded);
+      return loaded;
+    }
+  }
   const scale = visual.stages[stage]?.scale ?? visual.stages.kitten?.scale ?? 1;
   const canvas = drawCatPlaceholder(visual, scale);
   tex = canvasToNearestTexture(canvas);
@@ -60,6 +73,14 @@ export function preloadAllPlaceholders(): void {
   }
   for (const id of Object.keys(assetManifest.plants)) {
     getPlantTexture(id);
+  }
+}
+
+export async function preloadRealAtlas(): Promise<void> {
+  for (const [key, url] of Object.entries(realCatFrames)) {
+    const texture = await Assets.load<Texture>(url);
+    texture.source.scaleMode = "nearest";
+    textureCache.set(key, texture);
   }
 }
 

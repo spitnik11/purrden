@@ -1,12 +1,14 @@
 import { Application, Container, Graphics, Sprite, Text } from "pixi.js";
-import { getCatTexture, getPlantTexture, preloadAllPlaceholders } from "../assets/atlas";
+import { getCatTexture, getPlantTexture, preloadAllPlaceholders, preloadRealAtlas } from "../assets/atlas";
 import { catLabel, plantById } from "../game/content";
 import type { GameProjection } from "../game/types";
 import { hexNumber } from "../assets/palette";
 
-const SLOT_W = 72;
-const SLOT_H = 72;
-const GAP = 12;
+const VIEW_W = 960;
+const VIEW_H = 540;
+const SLOT_W = 112;
+const SLOT_H = 96;
+const GAP = 96;
 /** Display scale for native 32×32 cats (integer only). */
 const CAT_SCALE = 2;
 const PLANT_SCALE = 2;
@@ -29,8 +31,8 @@ export class GardenPixi {
   async init(): Promise<void> {
     const app = new Application();
     await app.init({
-      width: 340,
-      height: 200,
+      width: VIEW_W,
+      height: VIEW_H,
       background: "#257179",
       antialias: false,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -41,12 +43,12 @@ export class GardenPixi {
     this.host.replaceChildren(app.canvas);
     app.canvas.style.imageRendering = "pixelated";
     app.canvas.style.width = "100%";
-    app.canvas.style.maxWidth = "420px";
-    app.canvas.style.borderRadius = "8px";
+    app.canvas.style.height = "100%";
     this.app = app;
     this.root = new Container();
     app.stage.addChild(this.root);
     preloadAllPlaceholders();
+    await preloadRealAtlas();
   }
 
   render(proj: GameProjection): void {
@@ -55,7 +57,8 @@ export class GardenPixi {
 
     // ground strip
     const ground = new Graphics();
-    ground.rect(0, 140, 340, 60).fill(hexNumber("moss"));
+    ground.rect(0, 390, VIEW_W, 150).fill(hexNumber("moss"));
+    ground.rect(0, 440, VIEW_W, 100).fill(hexNumber("soil"));
     this.root.addChild(ground);
 
     // sky / lighting via palette (no blur filters)
@@ -69,25 +72,35 @@ export class GardenPixi {
             : hexNumber("cool_blue");
     this.app.renderer.background.color = skyColor;
 
+    const far = new Graphics();
+    far.moveTo(0, 320).lineTo(130, 210).lineTo(280, 300).lineTo(440, 190).lineTo(620, 285).lineTo(780, 205).lineTo(960, 315).lineTo(960, 390).lineTo(0, 390).fill(hexNumber("deep"));
+    this.root.addChild(far);
+    const near = new Graphics();
+    for (let x = 0; x < VIEW_W; x += 150) near.circle(x + 45, 355, 70).fill(hexNumber("pine"));
+    this.root.addChild(near);
+
     const sun = new Graphics();
-    sun.circle(300, 28, 18).fill(
+    sun.circle(830, 92, 42).fill(
       proj.world.daylight === "night" ? hexNumber("cloud") : hexNumber("gold"),
     );
     this.root.addChild(sun);
 
+    const direction = new Text({ text: "←  explore the garden  →", style: { fontFamily: "monospace", fontSize: 14, fill: hexNumber("cloud") } });
+    direction.x = 360; direction.y = 480; this.root.addChild(direction);
+
     if (proj.world.precipitation === "rain" || proj.world.precipitation === "drizzle") {
       const rain = new Graphics();
-      for (let i = 0; i < 24; i++) {
-        const x = 10 + ((i * 37) % 320);
-        const y = 10 + ((i * 17) % 120);
+      for (let i = 0; i < 54; i++) {
+        const x = 10 + ((i * 97) % 940);
+        const y = 10 + ((i * 47) % 380);
         rain.rect(x, y, 1, 6).fill(hexNumber("ice"));
       }
       this.root.addChild(rain);
     }
 
     proj.slots.forEach((slot, i) => {
-      const x = 16 + i * (SLOT_W + GAP);
-      const y = 90;
+      const x = 88 + i * (SLOT_W + GAP);
+      const y = 330;
       const pad = new Graphics();
       pad.roundRect(x, y, SLOT_W, SLOT_H, 6).fill(hexNumber("coal")).stroke({
         width: 2,

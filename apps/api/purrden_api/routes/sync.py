@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import BffSession
+from ..auth import player_from_request
 from ..schemas import BootstrapOut, SyncIn, SyncOut
 from ..services.sync import apply_sync, get_player_save
 
@@ -24,10 +25,11 @@ def _player_from_session(
 
 @router.get("/bootstrap", response_model=BootstrapOut)
 def bootstrap(
+    request: Request,
     db: Session = Depends(get_db),
     x_purrden_session: str | None = Header(default=None, alias="X-Purrden-Session"),
 ) -> BootstrapOut:
-    player_id = _player_from_session(db, x_purrden_session)
+    player_id = player_from_request(request, db, x_purrden_session)
     try:
         _player, save = get_player_save(db, player_id)
     except LookupError as e:
@@ -43,11 +45,13 @@ def bootstrap(
 @router.post("/sync", response_model=SyncOut)
 def sync(
     body: SyncIn,
+    request: Request,
     db: Session = Depends(get_db),
     x_purrden_session: str | None = Header(default=None, alias="X-Purrden-Session"),
+    x_csrf_token: str | None = Header(default=None, alias="X-CSRF-Token"),
 ) -> SyncOut:
     """Append-only command sync. Retries are harmless (command_id uniqueness)."""
-    player_id = _player_from_session(db, x_purrden_session)
+    player_id = player_from_request(request, db, x_purrden_session, x_csrf_token, write=True)
     try:
         result = apply_sync(
             db,

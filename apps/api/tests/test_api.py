@@ -140,6 +140,23 @@ def test_unauthorized_sync():
     assert r.status_code == 401
 
 
+def test_cookie_write_requires_matching_csrf():
+    c = client()
+    session = c.post("/v1/guest").json()["session_id"]
+    from purrden_api.auth import new_csrf
+    from purrden_api.db import SessionLocal
+    from purrden_api.models import BffSession
+    token = new_csrf()
+    with SessionLocal() as db:
+        row = db.get(BffSession, session)
+        row.csrf_token = token
+        db.commit()
+    c.cookies.set("purrden_session", session)
+    body = {"knownSaveVersion": 0, "commands": []}
+    assert c.post("/v1/sync", json=body).status_code == 403
+    assert c.post("/v1/sync", json=body, headers={"X-CSRF-Token": token}).status_code == 200
+
+
 def test_claim_genesis_and_join_second_device():
     c = client()
     # Claim a local-looking projection

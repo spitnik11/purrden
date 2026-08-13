@@ -29,7 +29,8 @@ body {
 }
 
 #app {
-  max-width: 960px;
+  width: 100%;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 1rem 1rem 3rem;
 }
@@ -55,15 +56,7 @@ header .tag {
 }
 
 .grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-}
-
-@media (min-width: 800px) {
-  .grid {
-    grid-template-columns: 1.2fr 0.8fr;
-  }
+  position: relative;
 }
 
 .panel {
@@ -210,9 +203,82 @@ select:focus-visible {
 }
 
 #garden-host {
-  min-height: 200px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 360px;
+  max-height: calc(100vh - 13rem);
   display: flex;
   justify-content: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--muted) 35%, transparent);
+  background: var(--bg);
+}
+
+.game-stage {
+  padding: 0.55rem;
+}
+
+.game-stage > h2,
+.game-stage > .slots-list,
+.game-stage > .muted,
+.game-stage > .plant-picker {
+  display: none;
+}
+
+.game-menu {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0 0 0.55rem;
+  overflow-x: auto;
+}
+
+.game-menu button {
+  min-width: 44px;
+  min-height: 44px;
+  background: color-mix(in srgb, var(--panel-2) 88%, transparent);
+}
+
+.game-menu button[aria-expanded="true"] {
+  border-color: var(--good);
+  color: var(--good);
+}
+
+.grid > div:last-child {
+  position: absolute;
+  z-index: 20;
+  top: 3.75rem;
+  right: 0.75rem;
+  width: min(420px, calc(100% - 1.5rem));
+}
+
+.menu-panel {
+  max-height: calc(100vh - 12rem);
+  overflow: auto;
+  background: color-mix(in srgb, var(--panel) 96%, #111320);
+  box-shadow: 0 20px 60px #111320dd;
+  backdrop-filter: none;
+}
+
+.menu-close {
+  float: right;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@media (max-width: 700px) {
+  #app { padding: 0.5rem; }
+  header .tag { display: none; }
+  #garden-host { min-height: calc(100dvh - 12rem); max-height: calc(100dvh - 10rem); }
+  .grid > div:last-child { position: fixed; top: auto; bottom: 0.25rem; right: 0.25rem; width: calc(100% - 0.5rem); }
+  .menu-panel { max-height: 50dvh; border-radius: 14px 14px 8px 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
 
 .dex-grid {

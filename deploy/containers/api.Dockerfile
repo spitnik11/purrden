@@ -8,6 +8,8 @@ COPY apps/api/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY apps/api /app
+COPY apps/worker /app/apps/worker
+COPY apps/scheduler /app/apps/scheduler
 # Shared domain packages available for later ports
 COPY packages/spawn-engine-py /packages/spawn-engine-py
 COPY packages/domain-python /packages/domain-python
