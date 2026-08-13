@@ -259,6 +259,12 @@ select:focus-visible {
   backdrop-filter: none;
 }
 
+.menu-panel button,
+.menu-panel select,
+.menu-panel input {
+  min-height: 44px;
+}
+
 .menu-close {
   float: right;
   min-width: 44px;

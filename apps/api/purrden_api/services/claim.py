@@ -9,7 +9,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from ..models import BffSession, Device, Player, PlayerSave
-from ..auth import session_expired
+from ..auth import new_csrf, session_expired
 from ..projection import CONTENT_VERSION, PLANT_COSTS, empty_projection
 
 
@@ -188,7 +188,7 @@ def create_guest_player(
     )
     db.add(save)
     db.add(Device(player_id=player.id, device_id=device_id, label=label))
-    session = BffSession(player_id=player.id, expires_at=datetime.now(timezone.utc) + timedelta(days=30))
+    session = BffSession(player_id=player.id, csrf_token=new_csrf(), expires_at=datetime.now(timezone.utc) + timedelta(days=30))
     db.add(session)
     db.commit()
 
@@ -230,7 +230,7 @@ def join_session(
         db.commit()
 
     # New opaque session token for this browser (same player)
-    new_sess = BffSession(player_id=player.id, expires_at=datetime.now(timezone.utc) + timedelta(days=30))
+    new_sess = BffSession(player_id=player.id, csrf_token=new_csrf(), expires_at=datetime.now(timezone.utc) + timedelta(days=30))
     db.add(new_sess)
     db.commit()
     db.refresh(save)

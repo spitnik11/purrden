@@ -274,3 +274,11 @@ def test_logout_revokes_cookie_session():
     )
     assert response.status_code == 303
     assert c.get("/v1/bootstrap").status_code == 401
+
+
+def test_guest_issues_bff_and_csrf_cookies():
+    c = client()
+    response = c.post("/v1/guest")
+    cookies = response.headers.get_list("set-cookie")
+    assert any("purrden_session=" in value and "HttpOnly" in value for value in cookies)
+    assert any("purrden_csrf=" in value and "HttpOnly" not in value for value in cookies)

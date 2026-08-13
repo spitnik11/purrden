@@ -12,7 +12,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from ..auth import new_csrf, player_from_request
+from ..auth import new_csrf, player_from_request, set_session_cookies
 from ..config import get_settings
 from ..db import get_db
 from ..models import BffSession, Player
@@ -41,10 +41,12 @@ def login(request: Request) -> RedirectResponse:
 
 
 @router.get("/callback")
-def callback(request: Request, code: str, state: str, db: Session = Depends(get_db)) -> RedirectResponse:
+def callback(request: Request, state: str, code: str | None = None, error: str | None = None, db: Session = Depends(get_db)) -> RedirectResponse:
     s = get_settings()
     if not request.cookies.get("purrden_oidc_state") or not secrets.compare_digest(state, request.cookies["purrden_oidc_state"]):
         raise HTTPException(status_code=400, detail="invalid_oidc_state")
+    if error or not code:
+        raise HTTPException(status_code=400, detail="oidc_login_failed")
     token_url = f"{s.keycloak_internal_url}/realms/{s.keycloak_realm}/protocol/openid-connect/token"
     data = {"grant_type": "authorization_code", "client_id": s.keycloak_client_id, "code": code, "redirect_uri": f"{s.public_url}/v1/auth/callback", "code_verifier": request.cookies.get("purrden_oidc_verifier", "")}
     if s.keycloak_client_secret:
@@ -68,8 +70,7 @@ def callback(request: Request, code: str, state: str, db: Session = Depends(get_
     session = BffSession(player_id=player.id, csrf_token=new_csrf(), expires_at=datetime.now(timezone.utc) + timedelta(days=30))
     db.add(session); db.commit()
     response = RedirectResponse("/")
-    _cookie(response, "__Host-purrden_session" if s.cookie_secure else "purrden_session", session.id, max_age=60 * 60 * 24 * 30)
-    _cookie(response, "purrden_csrf", session.csrf_token or "", http_only=False, max_age=60 * 60 * 24 * 30)
+    set_session_cookies(response, session)
     response.delete_cookie("purrden_oidc_state"); response.delete_cookie("purrden_oidc_verifier"); response.delete_cookie("purrden_claim_session")
     return response
 

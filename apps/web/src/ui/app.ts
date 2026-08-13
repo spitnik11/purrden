@@ -11,6 +11,7 @@ import {
   reconcileCloud,
   type CloudInfo,
 } from "../cloud/outbox";
+import { logout } from "../cloud/client";
 import {
   dispatch,
   exportSaveJson,
@@ -373,6 +374,8 @@ function mountShell(root: HTMLElement): void {
             <button id="btn-cloud-reconcile">Reconcile</button>
             <button id="btn-cloud-pull">Pull bootstrap</button>
             <button class="danger" id="btn-cloud-disconnect">Disconnect</button>
+            <button id="btn-account-login">Sign in / claim account</button>
+            <button id="btn-account-logout">Sign out</button>
           </div>
           <div class="row" style="margin-top:0.5rem">
             <label class="muted" style="flex:1">Share session
@@ -510,6 +513,8 @@ function mountShell(root: HTMLElement): void {
   $("#btn-cloud-reconcile").onclick = () => void cloudAction("reconcile");
   $("#btn-cloud-pull").onclick = () => void cloudAction("pull");
   $("#btn-cloud-disconnect").onclick = () => void cloudAction("disconnect");
+  $("#btn-account-login").onclick = () => { window.location.assign("/api/v1/auth/login"); };
+  $("#btn-account-logout").onclick = async () => { await logout(); window.location.reload(); };
   $("#btn-cloud-copy-share").onclick = async () => {
     const id = cloudInfo?.shareSessionId;
     if (!id) return;
