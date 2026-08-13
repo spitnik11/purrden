@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import __version__
 from .config import get_settings
@@ -12,8 +12,8 @@ from .routes import auth, guest, health, sync, visits, world
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Dev/test convenience. Production should run Alembic migrations.
-    init_db()
+    if get_settings().env.lower() != "production":
+        init_db()
     yield
 
 
@@ -24,6 +24,9 @@ def create_app() -> FastAPI:
         version=__version__,
         description="Phase 2 cloud-save BFF — command ledger + projection",
         lifespan=lifespan,
+        docs_url=None if settings.env.lower() == "production" else "/docs",
+        redoc_url=None if settings.env.lower() == "production" else "/redoc",
+        openapi_url=None if settings.env.lower() == "production" else "/openapi.json",
     )
     app.add_middleware(
         CORSMiddleware,
@@ -32,6 +35,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_host_list)
     @app.middleware("http")
     async def security_headers(request, call_next):
         response = await call_next(request)

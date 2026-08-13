@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from ..models import BffSession, Device, Player, PlayerSave
+from ..auth import session_expired
 from ..projection import CONTENT_VERSION, PLANT_COSTS, empty_projection
 
 
@@ -186,7 +188,7 @@ def create_guest_player(
     )
     db.add(save)
     db.add(Device(player_id=player.id, device_id=device_id, label=label))
-    session = BffSession(player_id=player.id)
+    session = BffSession(player_id=player.id, expires_at=datetime.now(timezone.utc) + timedelta(days=30))
     db.add(session)
     db.commit()
 
@@ -208,11 +210,11 @@ def join_session(
 ) -> dict[str, Any]:
     """Second browser joins an existing guest session (share session id for alpha)."""
     sess = db.get(BffSession, session_id)
-    if not sess or sess.revoked:
+    if not sess or sess.revoked or session_expired(sess.expires_at):
         raise ClaimError("invalid_session")
     player = db.get(Player, sess.player_id)
     save = db.get(PlayerSave, sess.player_id)
-    if not player or not save:
+    if not player or not save or not player.is_guest:
         raise ClaimError("player_not_found")
 
     device_id = device_id or str(uuid4())
@@ -228,7 +230,7 @@ def join_session(
         db.commit()
 
     # New opaque session token for this browser (same player)
-    new_sess = BffSession(player_id=player.id)
+    new_sess = BffSession(player_id=player.id, expires_at=datetime.now(timezone.utc) + timedelta(days=30))
     db.add(new_sess)
     db.commit()
     db.refresh(save)

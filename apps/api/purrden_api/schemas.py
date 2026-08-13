@@ -1,8 +1,15 @@
 from __future__ import annotations
 
 from typing import Any
+import json
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+def _bounded_json(value: Any, limit: int) -> Any:
+    if len(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode()) > limit:
+        raise ValueError("payload_too_large")
+    return value
 
 
 class HealthOut(BaseModel):
@@ -34,6 +41,11 @@ class GuestClaimIn(BaseModel):
     label: str | None = Field(default="claim", max_length=64)
     projection: dict[str, Any]
 
+    @field_validator("projection")
+    @classmethod
+    def projection_size(cls, value):
+        return _bounded_json(value, 256_000)
+
 
 class SessionJoinIn(BaseModel):
     """Second device joins an existing guest cloud (share session id for alpha)."""
@@ -62,6 +74,11 @@ class SyncCommandIn(BaseModel):
     type: str = Field(min_length=1, max_length=64)
     payload: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("payload")
+    @classmethod
+    def payload_size(cls, value):
+        return _bounded_json(value, 64_000)
+
 
 class SyncIn(BaseModel):
     knownSaveVersion: int = Field(ge=0)
@@ -80,6 +97,11 @@ class SyncOut(BaseModel):
     projection: dict[str, Any]
     acks: list[CommandAck]
     server_time: str
+
+
+class VisitScheduleIn(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
 
 
 class BootstrapOut(BaseModel):

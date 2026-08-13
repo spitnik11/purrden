@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -25,10 +26,34 @@ class Settings(BaseSettings):
     keycloak_client_secret: str = ""
     cookie_secure: bool = False
     broker_url: str = "amqp://guest:guest@rabbitmq:5672//"
+    trusted_hosts: str = "127.0.0.1,localhost,testserver"
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def trusted_host_list(self) -> list[str]:
+        return [h.strip() for h in self.trusted_hosts.split(",") if h.strip()]
+
+    @model_validator(mode="after")
+    def reject_insecure_production_defaults(self):
+        if self.env.lower() != "production":
+            return self
+        insecure = (
+            not self.cookie_secure
+            or not self.public_url.startswith("https://")
+            or "change-me" in self.guest_claim_pepper
+            or "local-only" in self.guest_claim_pepper
+            or len(self.spawn_hmac_secret_hex) < 64
+            or "guest:guest@" in self.broker_url
+            or "purrden:purrden@" in self.database_url
+            or "local-only" in self.broker_url
+            or "local-only" in self.database_url
+        )
+        if insecure:
+            raise ValueError("production requires HTTPS, secure cookies, and rotated database, broker, claim, and spawn secrets")
+        return self
 
 
 @lru_cache

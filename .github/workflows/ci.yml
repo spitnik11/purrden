@@ -68,6 +68,9 @@ jobs:
       - name: Typecheck and production build
         run: npm run build
 
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
   phase2-api:
     name: phase2-api-tests
     runs-on: ubuntu-latest
@@ -83,7 +86,7 @@ jobs:
 
       - name: Install
         run: |
-          pip install -r requirements.txt
+          pip install --require-hashes -r requirements.lock
           pip install pytest
 
       - name: Pytest
@@ -92,3 +95,8 @@ jobs:
           ENV: test
           PYTHONPATH: .
         run: python -m pytest tests/ -q
+
+      - name: Python dependency audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.lock

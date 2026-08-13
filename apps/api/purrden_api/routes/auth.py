@@ -3,12 +3,13 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from ..auth import new_csrf, player_from_request
@@ -63,7 +64,8 @@ def callback(request: Request, code: str, state: str, db: Session = Depends(get_
     if not player:
         player = Player(oidc_subject=identity["sub"], display_name=identity.get("preferred_username") or identity.get("name"), is_guest=0)
         db.add(player); db.flush()
-    session = BffSession(player_id=player.id, csrf_token=new_csrf())
+    db.execute(update(BffSession).where(BffSession.player_id == player.id).values(revoked=1))
+    session = BffSession(player_id=player.id, csrf_token=new_csrf(), expires_at=datetime.now(timezone.utc) + timedelta(days=30))
     db.add(session); db.commit()
     response = RedirectResponse("/")
     _cookie(response, "__Host-purrden_session" if s.cookie_secure else "purrden_session", session.id, max_age=60 * 60 * 24 * 30)
@@ -80,3 +82,17 @@ def claim_named(request: Request, db: Session = Depends(get_db), x_purrden_sessi
         raise HTTPException(status_code=409, detail="named_account_required")
     player.is_guest = 0; db.commit()
     return {"playerId": player.id, "claimed": True}
+
+
+@router.post("/logout")
+def logout(request: Request, db: Session = Depends(get_db), x_csrf_token: str | None = Header(default=None, alias="X-CSRF-Token")):
+    player_from_request(request, db, None, x_csrf_token, write=True)
+    session_id = request.cookies.get("__Host-purrden_session") or request.cookies.get("purrden_session")
+    session = db.get(BffSession, session_id)
+    session.revoked = 1
+    db.commit()
+    response = RedirectResponse("/", status_code=303)
+    response.delete_cookie("__Host-purrden_session", path="/", secure=True, httponly=True, samesite="lax")
+    response.delete_cookie("purrden_session", path="/", httponly=True, samesite="lax")
+    response.delete_cookie("purrden_csrf", path="/", samesite="lax")
+    return response
