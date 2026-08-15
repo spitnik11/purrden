@@ -74,17 +74,22 @@ jobs:
       - name: Install browser
         run: npx playwright install --with-deps chromium
 
-      - name: Start production web
-        run: docker compose -f ../../deploy/compose/docker-compose.yml --profile web up -d --build web
+      - name: Start browser test stack
+        run: docker compose -f ../../deploy/compose/docker-compose.yml --profile production up -d --build web api postgres keycloak
 
       - name: Browser release gate
         env:
           PURRDEN_E2E_BASE_URL: http://127.0.0.1:8080
         run: npm run e2e
 
-      - name: Stop production web
+      - name: Named-account release gate
+        env:
+          PURRDEN_AUTH_E2E: "1"
+        run: npm run e2e:auth
+
+      - name: Stop browser test stack
         if: always()
-        run: docker compose -f ../../deploy/compose/docker-compose.yml --profile web down
+        run: docker compose -f ../../deploy/compose/docker-compose.yml --profile production down --volumes
 
   phase2-api:
     name: phase2-api-tests

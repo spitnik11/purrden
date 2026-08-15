@@ -11,7 +11,8 @@
     "smoke": "tsx src/game/loop-smoke.ts",
     "smoke:cloud": "tsx src/cloud/sync-smoke.ts",
     "smoke:dom": "tsx src/ui/dom.test.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:auth": "playwright test e2e/auth.spec.ts"
   },
   "dependencies": {
     "dexie": "^4.4.4",
