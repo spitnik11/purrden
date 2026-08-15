@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 test("boots under the production CSP", async ({ page }) => {
   const response = await page.goto("/");
@@ -27,4 +28,15 @@ test("keeps the game large and menus keyboard accessible on mobile", async ({ pa
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(focusButton).toBeFocused();
+});
+
+test("has no WCAG 2.2 A or AA violations", async ({ page }) => {
+  await page.goto("/");
+  for (const name of ["Focus", "World", "Cat dex", "Cloud save", "Save"]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(results.violations, `${name} menu accessibility violations`).toEqual([]);
+  }
 });

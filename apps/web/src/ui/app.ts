@@ -284,7 +284,7 @@ function mountShell(root: HTMLElement): void {
     <div class="grid">
       <section class="panel">
         <h2>Garden</h2>
-        <div id="garden-host" aria-label="Garden scene"></div>
+        <div id="garden-host" role="img" aria-label="Garden scene"></div>
         <ul class="slots-list" id="slots-list"></ul>
         <div class="muted" style="margin-top:0.75rem">Selected plant:</div>
         <div class="plant-picker" id="plant-picker"></div>
