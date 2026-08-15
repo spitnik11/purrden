@@ -17,13 +17,15 @@ test("claims a guest into a named account and revokes it on logout", async ({ pa
   await page.getByRole("button", { name: "Sign in / claim account" }).click();
   await page.getByRole("link", { name: /register/i }).click();
   const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  await page.getByLabel("Username").fill(`purrden-${id}`);
-  await page.getByLabel("Email").fill(`purrden-${id}@example.test`);
-  await page.getByLabel("First name").fill("Purrden");
-  await page.getByLabel("Last name").fill("Test");
-  await page.getByLabel("Password", { exact: true }).fill(`Purrden-${id}!`);
-  await page.getByLabel("Confirm password").fill(`Purrden-${id}!`);
-  await page.getByRole("button", { name: "Register" }).click();
+  await page.locator("#username").fill(`purrden-${id}`);
+  await page.locator("#email").fill(`purrden-${id}@example.test`);
+  await page.locator("#firstName").fill("Purrden");
+  await page.locator("#lastName").fill("Test");
+  const password = page.locator("#password");
+  if (!await password.isVisible()) await page.locator('input[type="submit"]').click();
+  await password.fill(`Purrden-${id}!`);
+  await page.locator("#password-confirm").fill(`Purrden-${id}!`);
+  await page.locator('input[type="submit"]').click();
 
   await expect(page).toHaveURL("http://localhost:8080/");
   expect(await page.evaluate(async () => (await fetch("/api/v1/bootstrap")).json().then((body) => body.player_id))).toBe(playerId);
