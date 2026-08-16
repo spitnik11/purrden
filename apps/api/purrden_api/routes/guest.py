@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import BffSession
+from ..auth import set_session_cookies
 from ..schemas import (
     DeviceListOut,
     DeviceOut,
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/v1", tags=["guest"])
 
 @router.post("/guest", response_model=GuestCreateOut)
 def create_guest(
+    response: Response,
     body: GuestCreateIn | None = None,
     db: Session = Depends(get_db),
 ) -> GuestCreateOut:
@@ -35,12 +37,14 @@ def create_guest(
         device_id=body.deviceId,
         label=body.label or "initial",
     )
+    set_session_cookies(response, db.get(BffSession, result["session_id"]))
     return GuestCreateOut(**result)
 
 
 @router.post("/guest/claim", response_model=GuestCreateOut)
 def claim_guest_genesis(
     body: GuestClaimIn,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> GuestCreateOut:
     """
@@ -54,12 +58,14 @@ def claim_guest_genesis(
         projection=body.projection,
         display_name="Guest (claimed)",
     )
+    set_session_cookies(response, db.get(BffSession, result["session_id"]))
     return GuestCreateOut(**result)
 
 
 @router.post("/session/join", response_model=GuestCreateOut)
 def session_join(
     body: SessionJoinIn,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> GuestCreateOut:
     """Second browser joins via shared session id (alpha multi-device)."""
@@ -72,6 +78,7 @@ def session_join(
         )
     except ClaimError as e:
         raise HTTPException(status_code=401, detail=e.reason) from e
+    set_session_cookies(response, db.get(BffSession, result["session_id"]))
     return GuestCreateOut(**result)
 
 

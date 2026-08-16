@@ -11,6 +11,7 @@ import {
   reconcileCloud,
   type CloudInfo,
 } from "../cloud/outbox";
+import { logout } from "../cloud/client";
 import {
   dispatch,
   exportSaveJson,
@@ -92,23 +93,10 @@ function render(): void {
 
 function renderShell(): void {
   const store = getStore();
-  const { projection: p, focus, lastEvents, persistentStorage } = store;
-
-  const cloudBit = cloudInfo
-    ? cloudInfo.sessionId
-      ? ` · cloud ${cloudInfo.status}${cloudInfo.pendingCount ? ` (${cloudInfo.pendingCount} pending)` : ""}`
-      : " · cloud off"
-    : "";
+  const { projection: p, focus, lastEvents } = store;
   const saveMeta = $maybe("header .save-meta");
   if (saveMeta) {
-    saveMeta.textContent =
-      `v${p.saveVersion} · energy ${p.growthEnergy} · food ${p.food} · streak ${p.streakDays}d · spawns ${p.pendingSpawnWindows}` +
-      (persistentStorage === true
-        ? " · persistent storage"
-        : persistentStorage === false
-          ? " · storage not persisted"
-          : "") +
-      cloudBit;
+    saveMeta.textContent = `Energy ${p.growthEnergy} · Food ${p.food} · Visits ${p.pendingSpawnWindows}`;
   }
 
   // Cloud panel
@@ -293,10 +281,15 @@ function mountShell(root: HTMLElement): void {
       <div class="save-meta muted"></div>
     </header>
     <div id="error-banner" class="error-banner" hidden></div>
-    <div class="grid">
+    <main class="grid">
       <section class="panel">
         <h2>Garden</h2>
-        <div id="garden-host" aria-label="Garden scene"></div>
+        <div id="garden-host" role="img" aria-label="Garden scene"></div>
+        <div class="explore-controls" role="group" aria-label="Explore the garden">
+          <button id="btn-explore-left" aria-label="Explore left">←</button>
+          <span id="explore-position" aria-live="polite">Garden path 1 of 4</span>
+          <button id="btn-explore-right" aria-label="Explore right">→</button>
+        </div>
         <ul class="slots-list" id="slots-list"></ul>
         <div class="muted" style="margin-top:0.75rem">Selected plant:</div>
         <div class="plant-picker" id="plant-picker"></div>
@@ -386,6 +379,8 @@ function mountShell(root: HTMLElement): void {
             <button id="btn-cloud-reconcile">Reconcile</button>
             <button id="btn-cloud-pull">Pull bootstrap</button>
             <button class="danger" id="btn-cloud-disconnect">Disconnect</button>
+            <button id="btn-account-login">Sign in / claim account</button>
+            <button id="btn-account-logout">Sign out</button>
           </div>
           <div class="row" style="margin-top:0.5rem">
             <label class="muted" style="flex:1">Share session
@@ -410,8 +405,56 @@ function mountShell(root: HTMLElement): void {
           <ul class="log" id="event-log"></ul>
         </section>
       </div>
-    </div>
+    </main>
   `;
+
+  const menuLabels = ["Focus", "World", "Cat dex", "Cloud save", "Save"];
+  const side = root.querySelector(".grid > div:last-child");
+  const gardenPanel = root.querySelector(".grid > .panel");
+  if (side && gardenPanel) {
+    gardenPanel.classList.add("game-stage");
+    const nav = document.createElement("nav");
+    nav.className = "game-menu";
+    nav.setAttribute("aria-label", "Game menus");
+    [...side.querySelectorAll<HTMLElement>(":scope > .panel")].forEach((panel, index) => {
+      const id = `menu-panel-${index}`;
+      panel.id = id;
+      panel.classList.add("menu-panel");
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "false");
+      panel.setAttribute("aria-label", menuLabels[index] ?? `Menu ${index + 1}`);
+      panel.hidden = true;
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "menu-close";
+      close.setAttribute("aria-label", "Close menu");
+      close.textContent = "Close";
+      close.onclick = () => { panel.hidden = true; button.setAttribute("aria-expanded", "false"); button.focus(); };
+      panel.prepend(close);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = menuLabels[index] ?? `Menu ${index + 1}`;
+      button.setAttribute("aria-controls", id);
+      button.setAttribute("aria-expanded", "false");
+      button.onclick = () => {
+        const opening = panel.hidden;
+        side.querySelectorAll<HTMLElement>(".menu-panel").forEach((item) => (item.hidden = true));
+        nav.querySelectorAll("button").forEach((item) => item.setAttribute("aria-expanded", "false"));
+        panel.hidden = !opening;
+        button.setAttribute("aria-expanded", String(opening));
+        if (opening) panel.querySelector<HTMLElement>("button, select, input")?.focus();
+      };
+      nav.append(button);
+    });
+    gardenPanel.prepend(nav);
+    root.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const opener = nav.querySelector<HTMLButtonElement>('button[aria-expanded="true"]');
+      side.querySelectorAll<HTMLElement>(".menu-panel").forEach((item) => (item.hidden = true));
+      nav.querySelectorAll("button").forEach((item) => item.setAttribute("aria-expanded", "false"));
+      opener?.focus();
+    });
+  }
 
   const picker = $("#plant-picker");
   for (const plant of PLANTS) {
@@ -477,6 +520,8 @@ function mountShell(root: HTMLElement): void {
   $("#btn-cloud-reconcile").onclick = () => void cloudAction("reconcile");
   $("#btn-cloud-pull").onclick = () => void cloudAction("pull");
   $("#btn-cloud-disconnect").onclick = () => void cloudAction("disconnect");
+  $("#btn-account-login").onclick = () => { window.location.assign("/api/v1/auth/login"); };
+  $("#btn-account-logout").onclick = async () => { await logout(); window.location.reload(); };
   $("#btn-cloud-copy-share").onclick = async () => {
     const id = cloudInfo?.shareSessionId;
     if (!id) return;
@@ -575,6 +620,12 @@ export async function startApp(root: HTMLElement): Promise<void> {
     }
   });
   await garden.init();
+  const explore = (delta: number) => {
+    const position = garden?.pan(delta) ?? 1;
+    $("explore-position").textContent = `Garden path ${position} of 4`;
+  };
+  $("btn-explore-left").onclick = () => explore(-320);
+  $("btn-explore-right").onclick = () => explore(320);
 
   subscribe(() => {
     void refreshCloud(false).finally(() => render());
@@ -597,4 +648,3 @@ export async function startApp(root: HTMLElement): Promise<void> {
   render();
   void selectedSlot;
 }
-

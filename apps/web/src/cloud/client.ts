@@ -60,6 +60,10 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
   if (sessionId) headers.set(SESSION_HEADER, sessionId);
+  if (init.method && !["GET", "HEAD", "OPTIONS"].includes(init.method.toUpperCase())) {
+    const csrf = typeof document === "undefined" ? null : document.cookie.match(/(?:^|; )purrden_csrf=([^;]*)/)?.[1];
+    if (csrf) headers.set("X-CSRF-Token", decodeURIComponent(csrf));
+  }
 
   let res: Response;
   try {
@@ -146,4 +150,8 @@ export function syncCommands(
 
 export function health(): Promise<{ status: string; version: string; env: string }> {
   return request("/health");
+}
+
+export async function logout(): Promise<void> {
+  await request("/v1/auth/logout", { method: "POST" });
 }

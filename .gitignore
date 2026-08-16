@@ -8,12 +8,15 @@ venv/
 dist/
 build/
 apps/web/dev-dist/
+apps/web/playwright-report/
+apps/web/test-results/
 .coverage
 htmlcov/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .turbo/
+.worktrees/
 *.tsbuildinfo
 
 # Env & secrets

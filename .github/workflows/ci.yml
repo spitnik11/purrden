@@ -68,6 +68,29 @@ jobs:
       - name: Typecheck and production build
         run: npm run build
 
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Start browser test stack
+        run: docker compose -f ../../deploy/compose/docker-compose.yml --profile production up -d --build web api postgres keycloak
+
+      - name: Browser release gate
+        env:
+          PURRDEN_E2E_BASE_URL: http://127.0.0.1:8080
+        run: npm run e2e
+
+      - name: Named-account release gate
+        env:
+          PURRDEN_AUTH_E2E: "1"
+        run: npm run e2e:auth
+
+      - name: Stop browser test stack
+        if: always()
+        run: docker compose -f ../../deploy/compose/docker-compose.yml --profile production down --volumes
+
   phase2-api:
     name: phase2-api-tests
     runs-on: ubuntu-latest
@@ -83,7 +106,7 @@ jobs:
 
       - name: Install
         run: |
-          pip install -r requirements.txt
+          pip install --require-hashes -r requirements.lock
           pip install pytest
 
       - name: Pytest
@@ -92,3 +115,8 @@ jobs:
           ENV: test
           PYTHONPATH: .
         run: python -m pytest tests/ -q
+
+      - name: Python dependency audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.lock

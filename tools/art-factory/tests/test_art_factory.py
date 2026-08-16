@@ -20,7 +20,7 @@ from purrden_art.comfy_client import (  # noqa: E402
 )
 from purrden_art.pipeline import JobState, run_job  # noqa: E402
 from purrden_art.prompt_compiler import compile_plan  # noqa: E402
-from purrden_art.repair import make_fixture_cat_png, repair_to_sprite  # noqa: E402
+from purrden_art.repair import make_fixture_cat_png, remove_edge_background, repair_to_sprite  # noqa: E402
 
 
 class ComfyValidationTests(unittest.TestCase):
@@ -56,6 +56,26 @@ class ComfyValidationTests(unittest.TestCase):
 
 
 class RepairTests(unittest.TestCase):
+    def test_opaque_edge_background_becomes_transparent(self):
+        from PIL import Image
+
+        im = Image.new("RGBA", (12, 12), (231, 220, 190, 255))
+        for y in range(3, 9):
+            for x in range(4, 8):
+                im.putpixel((x, y), (80, 100, 125, 255))
+        repaired = remove_edge_background(im)
+        self.assertEqual(repaired.getpixel((0, 0))[3], 0)
+        self.assertEqual(repaired.getpixel((5, 5))[3], 255)
+
+        inset = Image.new("RGBA", (14, 14), (0, 0, 0, 0))
+        for y in range(2, 12):
+            for x in range(2, 12):
+                inset.putpixel((x, y), (231, 220, 190, 255))
+        inset.putpixel((7, 7), (80, 100, 125, 255))
+        repaired = remove_edge_background(inset)
+        self.assertEqual(repaired.getpixel((2, 2))[3], 0)
+        self.assertEqual(repaired.getpixel((7, 7))[3], 255)
+
     def test_fixture_repairs_to_32_and_passes_qa(self):
         with tempfile.TemporaryDirectory() as td:
             raw = make_fixture_cat_png(Path(td) / "raw.png", size=256)

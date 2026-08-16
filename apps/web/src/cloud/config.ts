@@ -13,8 +13,7 @@ export function apiBase(): string {
   try {
     const fromEnv = import.meta.env?.VITE_API_BASE as string | undefined;
     if (fromEnv && fromEnv.trim()) return fromEnv.replace(/\/$/, "");
-    // Same-origin proxy path in Vite browser dev.
-    if (import.meta.env?.DEV) return "/api";
+    if (typeof window !== "undefined") return "/api";
   } catch {
     /* import.meta.env unavailable outside Vite */
   }

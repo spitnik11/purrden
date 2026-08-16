@@ -11,8 +11,10 @@ integration, and scalable cloud deployment.**
 > AI creates build-time art; accepted PNGs are ordinary static assets.
 
 License: **AGPL-3.0-or-later** (code). Design notes: [`docs/DESIGN-NOTES.md`](docs/DESIGN-NOTES.md).
+Current code map and complete remaining work:
+[`docs/CATCH-UP-AND-REMAINING-WORK.md`](docs/CATCH-UP-AND-REMAINING-WORK.md).
 
-## Status: Phase 2 — Cloud-save alpha (started)
+## Status: production-oriented local alpha
 
 | Gate | State |
 |---|---|
@@ -25,7 +27,10 @@ License: **AGPL-3.0-or-later** (code). Design notes: [`docs/DESIGN-NOTES.md`](do
 | Browser outbox → /v1/sync | Done |
 | Multi-device claim / join / reconcile | Done |
 | **Content-ID placeholder atlas (Pixi nearest)** | **Done** |
-| Keycloak BFF cookies | Deferred (ADR 0004) |
+| Keycloak BFF cookies, CSRF, named-account claims | Done |
+| World context → scheduler → outbox → Celery/RabbitMQ → inbox | Working vertical slice |
+| Side-scroller camera/parallax | Foundation; player movement and animation remain |
+| Public Internet deployment | Not started |
 
 ## Layout
 

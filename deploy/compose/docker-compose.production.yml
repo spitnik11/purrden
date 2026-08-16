@@ -1,0 +1,47 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    ports: []
+
+  api:
+    environment:
+      ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      BROKER_URL: ${BROKER_URL:?Set BROKER_URL}
+      GUEST_CLAIM_PEPPER: ${GUEST_CLAIM_PEPPER:?Set GUEST_CLAIM_PEPPER}
+      SPAWN_HMAC_SECRET_HEX: ${SPAWN_HMAC_SECRET_HEX:?Set SPAWN_HMAC_SECRET_HEX}
+      PUBLIC_URL: ${PUBLIC_URL:?Set PUBLIC_URL}
+      KEYCLOAK_URL: ${KEYCLOAK_URL:?Set KEYCLOAK_URL}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
+      COOKIE_SECURE: "true"
+      CORS_ORIGINS: ${WEB_ORIGIN:?Set WEB_ORIGIN}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:?Set TRUSTED_HOSTS}
+    ports: []
+
+  rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
+    ports: []
+
+  keycloak:
+    command: start --import-realm --http-enabled=true --proxy-headers=xforwarded
+    environment:
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME: ${KEYCLOAK_URL:?Set KEYCLOAK_URL}
+      KC_DB: postgres
+      KC_DB_URL: ${KEYCLOAK_DATABASE_URL:?Set KEYCLOAK_DATABASE_URL}
+      KC_DB_USERNAME: ${KEYCLOAK_DATABASE_USER:?Set KEYCLOAK_DATABASE_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DATABASE_PASSWORD:?Set KEYCLOAK_DATABASE_PASSWORD}
+    ports: []
+
+  worker:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      BROKER_URL: ${BROKER_URL:?Set BROKER_URL}
+
+  scheduler:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      BROKER_URL: ${BROKER_URL:?Set BROKER_URL}

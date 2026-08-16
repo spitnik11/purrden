@@ -1,3 +1,4 @@
+import "pixi.js/unsafe-eval";
 import "./style.css";
 import { startApp } from "./ui/app";
 

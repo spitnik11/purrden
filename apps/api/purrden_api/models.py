@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Boolean,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -40,6 +41,7 @@ class Player(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     is_guest: Mapped[int] = mapped_column(Integer, default=1)  # 1=guest, 0=claimed account
+    oidc_subject: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
 
     devices: Mapped[list[Device]] = relationship(back_populates="player")
     save: Mapped[PlayerSave | None] = relationship(back_populates="player", uselist=False)
@@ -120,3 +122,34 @@ class BffSession(Base):
     )
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked: Mapped[int] = mapped_column(Integer, default=0)
+    csrf_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class SpawnSchedule(Base):
+    __tablename__ = "spawn_schedules"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    world: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
+
+
+class OutboxEvent(Base):
+    __tablename__ = "outbox_events"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    topic: Mapped[str] = mapped_column(String(64), index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
+    published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class VisitorInbox(Base):
+    __tablename__ = "visitor_inbox"
+    __table_args__ = (UniqueConstraint("schedule_id", name="uq_inbox_schedule"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    schedule_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    player_id: Mapped[str] = mapped_column(ForeignKey("players.id"), index=True)
+    cat_id: Mapped[str] = mapped_column(String(64))
+    world: Mapped[dict[str, Any]] = mapped_column(JsonType, default=dict)
+    read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

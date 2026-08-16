@@ -14,7 +14,7 @@ name: purrden
 
 services:
   web:
-    profiles: ["web", "core"]
+    profiles: ["web", "core", "production"]
     build:
       context: ../..
       dockerfile: deploy/containers/web.Dockerfile
@@ -24,14 +24,14 @@ services:
     restart: unless-stopped
 
   postgres:
-    profiles: ["core"]
+    profiles: ["core", "production"]
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: purrden
-      POSTGRES_PASSWORD: purrden
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-purrden-local-only}
       POSTGRES_DB: purrden
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - purrden_pg:/var/lib/postgresql/data
     healthcheck:
@@ -42,21 +42,85 @@ services:
     restart: unless-stopped
 
   api:
-    profiles: ["core"]
+    profiles: ["core", "production"]
     build:
       context: ../..
       dockerfile: deploy/containers/api.Dockerfile
     image: purrden-api:local
     environment:
-      DATABASE_URL: postgresql+psycopg://purrden:purrden@postgres:5432/purrden
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://purrden:purrden-local-only@postgres:5432/purrden}
       ENV: dev
       CORS_ORIGINS: http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:8080
+      PUBLIC_URL: http://localhost:8080/api
+      KEYCLOAK_URL: http://127.0.0.1:8081
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
 
+  rabbitmq:
+    profiles: ["production"]
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-purrden}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-purrden-local-only}
+    ports: ["127.0.0.1:5672:5672", "127.0.0.1:15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  keycloak:
+    profiles: ["production"]
+    image: quay.io/keycloak/keycloak:26.3
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-purrden-local-only}
+      KC_HOSTNAME: http://127.0.0.1:8081
+    ports: ["127.0.0.1:8081:8080"]
+    volumes:
+      - ../keycloak/purrden-realm.json:/opt/keycloak/data/import/purrden-realm.json:ro
+      - purrden_keycloak:/opt/keycloak/data
+    restart: unless-stopped
+
+  worker:
+    profiles: ["production"]
+    build:
+      context: ../..
+      dockerfile: deploy/containers/api.Dockerfile
+    command: celery -A apps.worker.worker.app worker --loglevel=INFO --concurrency=2 --without-gossip --without-mingle
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://purrden:purrden-local-only@postgres:5432/purrden}
+      BROKER_URL: ${BROKER_URL:-amqp://purrden:purrden-local-only@rabbitmq:5672//}
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+
+  scheduler:
+    profiles: ["production"]
+    build:
+      context: ../..
+      dockerfile: deploy/containers/api.Dockerfile
+    command: sh -c "while true; do python apps/scheduler/scheduler.py && python apps/scheduler/dispatch.py; sleep 30; done"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://purrden:purrden-local-only@postgres:5432/purrden}
+      BROKER_URL: ${BROKER_URL:-amqp://purrden:purrden-local-only@rabbitmq:5672//}
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+
 volumes:
   purrden_pg:
+  purrden_keycloak:

@@ -24,7 +24,7 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
-      registerType: "prompt",
+      registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
       manifest: {
         name: "Purrden",
@@ -47,6 +47,7 @@ export default defineConfig({
         // Cache app shell + static assets only. Never cache API or save blobs.
         globPatterns: ["**/*.{js,css,html,svg,png,json,woff2}"],
         navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api\//],
       },
       devOptions: {
         enabled: false,

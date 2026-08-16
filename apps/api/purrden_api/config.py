@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -16,10 +17,43 @@ class Settings(BaseSettings):
     # Guest claim / spawn secrets — rotate in real deploy; never ship real secrets.
     guest_claim_pepper: str = "dev-only-guest-pepper-change-me"
     spawn_hmac_secret_hex: str = "a3f1c09b5e7d42118826aa0134bf90cd"
+    weather_base_url: str = "https://api.open-meteo.com/v1/forecast"
+    public_url: str = "http://127.0.0.1:8000"
+    keycloak_url: str = "http://127.0.0.1:8081"
+    keycloak_internal_url: str = "http://keycloak:8080"
+    keycloak_realm: str = "purrden"
+    keycloak_client_id: str = "purrden-web"
+    keycloak_client_secret: str = ""
+    cookie_secure: bool = False
+    broker_url: str = "amqp://guest:guest@rabbitmq:5672//"
+    trusted_hosts: str = "127.0.0.1,localhost,testserver"
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def trusted_host_list(self) -> list[str]:
+        return [h.strip() for h in self.trusted_hosts.split(",") if h.strip()]
+
+    @model_validator(mode="after")
+    def reject_insecure_production_defaults(self):
+        if self.env.lower() != "production":
+            return self
+        insecure = (
+            not self.cookie_secure
+            or not self.public_url.startswith("https://")
+            or "change-me" in self.guest_claim_pepper
+            or "local-only" in self.guest_claim_pepper
+            or len(self.spawn_hmac_secret_hex) < 64
+            or "guest:guest@" in self.broker_url
+            or "purrden:purrden@" in self.database_url
+            or "local-only" in self.broker_url
+            or "local-only" in self.database_url
+        )
+        if insecure:
+            raise ValueError("production requires HTTPS, secure cookies, and rotated database, broker, claim, and spawn secrets")
+        return self
 
 
 @lru_cache

@@ -140,6 +140,24 @@ def test_unauthorized_sync():
     assert r.status_code == 401
 
 
+def test_cookie_write_requires_matching_csrf():
+    c = client()
+    session = c.post("/v1/guest").json()["session_id"]
+    from purrden_api.auth import new_csrf
+    from purrden_api.db import SessionLocal
+    from purrden_api.models import BffSession
+    token = new_csrf()
+    with SessionLocal() as db:
+        row = db.get(BffSession, session)
+        row.csrf_token = token
+        db.commit()
+    c.cookies.set("purrden_session", session)
+    body = {"knownSaveVersion": 0, "commands": []}
+    assert c.post("/v1/sync", json=body).status_code == 403
+    assert c.post("/v1/sync", json=body, headers={"X-CSRF-Token": token}).status_code == 403
+    assert c.post("/v1/sync", json=body, headers={"X-CSRF-Token": token, "Origin": "http://testserver"}).status_code == 200
+
+
 def test_claim_genesis_and_join_second_device():
     c = client()
     # Claim a local-looking projection
@@ -203,3 +221,64 @@ def test_claim_genesis_and_join_second_device():
     )
     assert s.status_code == 200
     assert s.json()["save_version"] == 1
+
+
+def test_visit_world_is_server_derived(monkeypatch):
+    monkeypatch.setattr(
+        "purrden_api.routes.visits.WorldContextService.get",
+        lambda _self, _lat, _lon: {"precipitation": "rain", "geoCell": "40.00,-74.00"},
+    )
+    c = client()
+    session = c.post("/v1/guest").json()["session_id"]
+    response = c.post(
+        "/v1/visits/schedule",
+        headers={"X-Purrden-Session": session},
+        json={"latitude": 40, "longitude": -74},
+    )
+    assert response.status_code == 200
+    assert c.post(
+        "/v1/visits/schedule",
+        headers={"X-Purrden-Session": session},
+        json={"latitude": 91, "longitude": -74, "precipitation": "storm"},
+    ).status_code == 422
+
+
+def test_production_settings_fail_closed(monkeypatch):
+    from pydantic import ValidationError
+    from purrden_api.config import Settings
+
+    monkeypatch.setenv("ENV", "production")
+    try:
+        Settings()
+        assert False, "insecure production defaults must fail"
+    except ValidationError:
+        pass
+
+
+def test_logout_revokes_cookie_session():
+    from purrden_api.auth import new_csrf
+    from purrden_api.db import SessionLocal
+    from purrden_api.models import BffSession
+
+    c = client()
+    session_id = c.post("/v1/guest").json()["session_id"]
+    token = new_csrf()
+    with SessionLocal() as db:
+        db.get(BffSession, session_id).csrf_token = token
+        db.commit()
+    c.cookies.set("purrden_session", session_id)
+    response = c.post(
+        "/v1/auth/logout",
+        headers={"Origin": "http://testserver", "X-CSRF-Token": token},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert c.get("/v1/bootstrap").status_code == 401
+
+
+def test_guest_issues_bff_and_csrf_cookies():
+    c = client()
+    response = c.post("/v1/guest")
+    cookies = response.headers.get_list("set-cookie")
+    assert any("purrden_session=" in value and "HttpOnly" in value for value in cookies)
+    assert any("purrden_csrf=" in value and "HttpOnly" not in value for value in cookies)
