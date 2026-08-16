@@ -287,6 +287,25 @@ select:focus-visible {
   }
 }
 
+@media (forced-colors: active) {
+  .panel,
+  #garden-host,
+  button,
+  select,
+  label.file-btn {
+    border-color: ButtonText;
+  }
+
+  button:focus-visible,
+  select:focus-visible {
+    outline: 3px solid Highlight;
+  }
+
+  .game-menu button[aria-expanded="true"] {
+    border: 2px solid Highlight;
+  }
+}
+
 .dex-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));

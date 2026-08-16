@@ -281,7 +281,7 @@ function mountShell(root: HTMLElement): void {
       <div class="save-meta muted"></div>
     </header>
     <div id="error-banner" class="error-banner" hidden></div>
-    <div class="grid">
+    <main class="grid">
       <section class="panel">
         <h2>Garden</h2>
         <div id="garden-host" role="img" aria-label="Garden scene"></div>
@@ -400,7 +400,7 @@ function mountShell(root: HTMLElement): void {
           <ul class="log" id="event-log"></ul>
         </section>
       </div>
-    </div>
+    </main>
   `;
 
   const menuLabels = ["Focus", "World", "Cat dex", "Cloud save", "Save"];

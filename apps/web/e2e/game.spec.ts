@@ -40,3 +40,21 @@ test("has no WCAG 2.2 A or AA violations", async ({ page }) => {
     expect(results.violations, `${name} menu accessibility violations`).toEqual([]);
   }
 });
+
+test.describe("accessibility preferences", () => {
+  test("supports keyboard-only play in Windows high contrast", async ({ page }) => {
+    await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+    await page.goto("/");
+    await expect(page.getByRole("main")).toBeVisible();
+    expect(await page.evaluate(() => matchMedia("(forced-colors: active)").matches)).toBe(true);
+    expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
+
+    await page.keyboard.press("Tab");
+    const focusButton = page.getByRole("button", { name: "Focus", exact: true });
+    await expect(focusButton).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog", { name: "Focus" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Close menu" })).toBeFocused();
+    expect(parseFloat(await focusButton.evaluate((button) => getComputedStyle(button).transitionDuration))).toBeLessThanOrEqual(0.00001);
+  });
+});
