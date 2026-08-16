@@ -6,6 +6,7 @@ import { hexNumber } from "../assets/palette";
 
 const VIEW_W = 960;
 const VIEW_H = 540;
+const WORLD_W = 1920;
 const SLOT_W = 112;
 const SLOT_H = 96;
 const GAP = 96;
@@ -22,6 +23,8 @@ export class GardenPixi {
   root: Container | null = null;
   private host: HTMLElement;
   private onSlotClick: (index: number) => void;
+  private cameraX = 0;
+  private projection: GameProjection | null = null;
 
   constructor(host: HTMLElement, onSlotClick: (index: number) => void) {
     this.host = host;
@@ -53,12 +56,14 @@ export class GardenPixi {
 
   render(proj: GameProjection): void {
     if (!this.app || !this.root) return;
+    this.projection = proj;
     this.root.removeChildren();
+    this.host.dataset.camera = String(this.cameraX);
 
     // ground strip
     const ground = new Graphics();
-    ground.rect(0, 390, VIEW_W, 150).fill(hexNumber("moss"));
-    ground.rect(0, 440, VIEW_W, 100).fill(hexNumber("soil"));
+    ground.rect(-this.cameraX, 390, WORLD_W, 150).fill(hexNumber("moss"));
+    ground.rect(-this.cameraX, 440, WORLD_W, 100).fill(hexNumber("soil"));
     this.root.addChild(ground);
 
     // sky / lighting via palette (no blur filters)
@@ -72,21 +77,19 @@ export class GardenPixi {
             : hexNumber("cool_blue");
     this.app.renderer.background.color = skyColor;
 
+    const farX = -this.cameraX * 0.2;
     const far = new Graphics();
-    far.moveTo(0, 320).lineTo(130, 210).lineTo(280, 300).lineTo(440, 190).lineTo(620, 285).lineTo(780, 205).lineTo(960, 315).lineTo(960, 390).lineTo(0, 390).fill(hexNumber("deep"));
+    far.moveTo(farX, 320).lineTo(farX + 260, 210).lineTo(farX + 560, 300).lineTo(farX + 880, 190).lineTo(farX + 1240, 285).lineTo(farX + 1560, 205).lineTo(farX + 1960, 315).lineTo(farX + 1960, 390).lineTo(farX, 390).fill(hexNumber("deep"));
     this.root.addChild(far);
     const near = new Graphics();
-    for (let x = 0; x < VIEW_W; x += 150) near.circle(x + 45, 355, 70).fill(hexNumber("pine"));
+    for (let x = -100; x < WORLD_W; x += 150) near.circle(x + 45 - this.cameraX * 0.5, 355, 70).fill(hexNumber("pine"));
     this.root.addChild(near);
 
     const sun = new Graphics();
-    sun.circle(830, 92, 42).fill(
+    sun.circle(830 - this.cameraX * 0.05, 92, 42).fill(
       proj.world.daylight === "night" ? hexNumber("cloud") : hexNumber("gold"),
     );
     this.root.addChild(sun);
-
-    const direction = new Text({ text: "←  explore the garden  →", style: { fontFamily: "monospace", fontSize: 14, fill: hexNumber("cloud") } });
-    direction.x = 360; direction.y = 480; this.root.addChild(direction);
 
     if (proj.world.precipitation === "rain" || proj.world.precipitation === "drizzle") {
       const rain = new Graphics();
@@ -99,7 +102,7 @@ export class GardenPixi {
     }
 
     proj.slots.forEach((slot, i) => {
-      const x = 88 + i * (SLOT_W + GAP);
+      const x = 180 + i * (SLOT_W + GAP * 3) - this.cameraX;
       const y = 330;
       const pad = new Graphics();
       pad.roundRect(x, y, SLOT_W, SLOT_H, 6).fill(hexNumber("coal")).stroke({
@@ -164,6 +167,22 @@ export class GardenPixi {
         this.root!.addChild(label);
       }
     });
+
+    const guideTexture = getCatTexture("cat:mizzle:v1", "kitten");
+    if (guideTexture) {
+      const guide = new Sprite(guideTexture);
+      guide.roundPixels = true;
+      guide.scale.set(CAT_SCALE);
+      guide.x = VIEW_W / 2 - 32;
+      guide.y = 376;
+      this.root.addChild(guide);
+    }
+  }
+
+  pan(delta: number): number {
+    this.cameraX = Math.max(0, Math.min(WORLD_W - VIEW_W, this.cameraX + delta));
+    if (this.projection) this.render(this.projection);
+    return Math.round(this.cameraX / 320) + 1;
   }
 
   private drawPlantFallback(plantId: string, x: number, y: number): void {

@@ -14,8 +14,8 @@ import { drawCatPlaceholder, drawPlantPlaceholder } from "./placeholder-draw";
 
 const textureCache = new Map<string, Texture>();
 const realCatFrames: Record<string, string> = {
-  [frameKey("cat:mizzle:v1", "kitten", "idle")]: "/assets/cats/mizzle-idle-right.png",
-  [frameKey("cat:mizzle:v1", "raincoat", "idle")]: "/assets/cats/mizzle-idle-right.png",
+  [frameKey("cat:mizzle:v1", "kitten", "idle")]: "/assets/cats/mizzle-idle-right-v2.png",
+  [frameKey("cat:mizzle:v1", "raincoat", "idle")]: "/assets/cats/mizzle-idle-right-v2.png",
 };
 
 function canvasToNearestTexture(canvas: HTMLCanvasElement): Texture {

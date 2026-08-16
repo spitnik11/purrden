@@ -14,7 +14,7 @@
     "sha256": "d10351f5259d2afbe3b334a936f2007c1a53ca5c680046c75ab7bf6ef2909b4e"
   }],
   "settings": { "width": 1024, "height": 1024, "steps": 24, "cfg": 6, "sampler": "euler_ancestral", "scheduler": "simple" },
-  "repair": "nearest-neighbor crop, Purrden palette quantization, binary alpha, 32x32 baseline composition",
-  "qa": { "passed": true, "opaqueColors": 15, "maxColors": 24, "binaryAlpha": true, "baselineY": 29 },
-  "outputSha256": "2c041279e78ec1f375a69e6169bf91fb3f9d6346ab595f57fe5ef36efde836b0"
+  "repair": "edge-connected background removal, nearest-neighbor crop, Purrden palette quantization, 9-color budget, binary alpha, 32x32 baseline composition",
+  "qa": { "passed": true, "opaqueColors": 8, "maxColors": 9, "binaryAlpha": true, "baselineY": 29 },
+  "outputSha256": "5aa1b2c585b9cd15ddb7c738884d013f4014daa8a8287066b341ab6cee7396b6"
 }

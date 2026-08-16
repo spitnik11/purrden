@@ -30,6 +30,17 @@ test("keeps the game large and menus keyboard accessible on mobile", async ({ pa
   await expect(focusButton).toBeFocused();
 });
 
+test("pans the side-scroller with accessible controls", async ({ page }) => {
+  await page.goto("/");
+  const scene = page.getByRole("img", { name: "Garden scene" });
+  await expect(scene).toHaveAttribute("data-camera", "0");
+  const right = page.getByRole("button", { name: "Explore right" });
+  await right.click();
+  await expect(scene).toHaveAttribute("data-camera", "320");
+  await expect(page.getByText("Garden path 2 of 4")).toBeVisible();
+  await expect(right).toHaveCSS("min-height", "44px");
+});
+
 test("has no WCAG 2.2 A or AA violations", async ({ page }) => {
   await page.goto("/");
   for (const name of ["Focus", "World", "Cat dex", "Cloud save", "Save"]) {

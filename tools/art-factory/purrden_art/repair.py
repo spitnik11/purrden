@@ -11,6 +11,7 @@ No generative models here — pure image processing (Pillow).
 """
 from __future__ import annotations
 
+from collections import Counter, deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -63,6 +64,49 @@ def subject_bbox(im, alpha_threshold: int = 16) -> tuple[int, int, int, int] | N
     if max_x < 0:
         return None
     return (min_x, min_y, max_x + 1, max_y + 1)
+
+
+def remove_edge_background(im, tolerance: int = 48):
+    """Clear near-corner colours only when connected to an image edge."""
+    rgba = im.convert("RGBA")
+    pixels = rgba.load()
+    w, h = rgba.size
+    backgrounds = [pixels[x, y][:3] for x, y in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1))]
+    if any(a == 0 for _, _, _, a in rgba.getdata()):
+        boundary = Counter(
+            pixels[x, y][:3]
+            for y in range(h)
+            for x in range(w)
+            if pixels[x, y][3]
+            and any(
+                0 <= nx < w and 0 <= ny < h and pixels[nx, ny][3] == 0
+                for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1))
+            )
+        )
+        if boundary:
+            backgrounds.append(boundary.most_common(1)[0][0])
+    limit = tolerance * tolerance
+
+    def is_background(x: int, y: int) -> bool:
+        r, g, b, a = pixels[x, y]
+        return a == 0 or any(
+            (r - br) ** 2 + (g - bg) ** 2 + (b - bb) ** 2 <= limit
+            for br, bg, bb in backgrounds
+        )
+
+    queue = deque((x, y) for x in range(w) for y in (0, h - 1))
+    queue.extend((x, y) for y in range(1, h - 1) for x in (0, w - 1))
+    seen: set[tuple[int, int]] = set()
+    while queue:
+        x, y = queue.popleft()
+        if (x, y) in seen or not is_background(x, y):
+            continue
+        seen.add((x, y))
+        pixels[x, y] = (0, 0, 0, 0)
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if 0 <= nx < w and 0 <= ny < h:
+                queue.append((nx, ny))
+    return rgba
 
 
 def crop_and_pad_square(im, margin_ratio: float = 0.08):
@@ -121,6 +165,16 @@ def quantize_to_palette(im, palette_rgb: Sequence[tuple[int, int, int]] = _PALET
     return result
 
 
+def constrain_color_budget(im, max_colors: int = 9):
+    """Keep dominant approved colours and remap minor colours to the nearest one."""
+    rgba = im.convert("RGBA")
+    counts = Counter((r, g, b) for r, g, b, a in rgba.getdata() if a >= 128)
+    if len(counts) <= max_colors:
+        return rgba
+    kept = [color for color, _ in counts.most_common(max_colors)]
+    return quantize_to_palette(rgba, kept)
+
+
 def enforce_binary_alpha(im, threshold: int = 128):
     Image = _require_pil()
     rgba = im.convert("RGBA")
@@ -177,13 +231,13 @@ def repair_to_sprite(
     Image = _require_pil()
     im = Image.open(source)
     im.load()
-    squared = crop_and_pad_square(im)
+    squared = crop_and_pad_square(remove_edge_background(im))
     # Downsample slightly larger than native first for cleaner silhouette, then compose
     intermediate = nearest_resize(squared, (native[0] * 2, native[1] * 2))
     quantized = quantize_to_palette(intermediate)
     binary = enforce_binary_alpha(quantized)
     final = place_on_baseline(binary, canvas_size=native, baseline_y=baseline_y)
-    final = quantize_to_palette(final)
+    final = constrain_color_budget(quantize_to_palette(final))
     final = enforce_binary_alpha(final)
 
     dest = Path(dest)

@@ -285,6 +285,11 @@ function mountShell(root: HTMLElement): void {
       <section class="panel">
         <h2>Garden</h2>
         <div id="garden-host" role="img" aria-label="Garden scene"></div>
+        <div class="explore-controls" role="group" aria-label="Explore the garden">
+          <button id="btn-explore-left" aria-label="Explore left">←</button>
+          <span id="explore-position" aria-live="polite">Garden path 1 of 4</span>
+          <button id="btn-explore-right" aria-label="Explore right">→</button>
+        </div>
         <ul class="slots-list" id="slots-list"></ul>
         <div class="muted" style="margin-top:0.75rem">Selected plant:</div>
         <div class="plant-picker" id="plant-picker"></div>
@@ -615,6 +620,12 @@ export async function startApp(root: HTMLElement): Promise<void> {
     }
   });
   await garden.init();
+  const explore = (delta: number) => {
+    const position = garden?.pan(delta) ?? 1;
+    $("explore-position").textContent = `Garden path ${position} of 4`;
+  };
+  $("btn-explore-left").onclick = () => explore(-320);
+  $("btn-explore-right").onclick = () => explore(320);
 
   subscribe(() => {
     void refreshCloud(false).finally(() => render());
